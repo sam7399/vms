@@ -17,6 +17,8 @@
     "@vms/database": "*",
     "socket.io-client": "^4.7.2",
     "framer-motion": "^10.16.16",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.2",
     "lucide-react": "^0.376.0"
   },
   "devDependencies": {

@@ -2,15 +2,17 @@
 
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { LiveHeadcountCard } from "@/components/dashboard/LiveHeadcountCard";
 import { VisitorsTable } from "@/components/dashboard/VisitorsTable";
 import { ComplianceStatus } from "@/components/dashboard/ComplianceStatus";
+import { BranchFilter } from "@/components/dashboard/BranchFilter";
 import { DashboardHeader } from "@/components/dashboard-header";
 
 export default function DashboardPage() {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const [branchId, setBranchId] = useState("");
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -37,19 +39,18 @@ export default function DashboardPage() {
     <main className="min-h-screen w-full">
       <DashboardHeader />
 
-      {/* Live Headcount Section */}
       <div className="max-w-7xl mx-auto px-6">
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold text-white mb-4">
-            Live Occupancy
-          </h2>
-          <LiveHeadcountCard />
+        <div className="mt-8 flex items-center justify-between gap-4 flex-wrap">
+          <h2 className="text-xl font-semibold text-white">Live Occupancy</h2>
+          <BranchFilter value={branchId} onChange={setBranchId} />
+        </div>
+        <div className="mt-4">
+          <LiveHeadcountCard branchId={branchId} />
         </div>
 
-        {/* Grid Layout for Tables */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8 pb-12">
           <div className="lg:col-span-2">
-            <VisitorsTable />
+            <VisitorsTable branchId={branchId} />
           </div>
           <div>
             <ComplianceStatus />

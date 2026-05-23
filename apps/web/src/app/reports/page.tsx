@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
-import { Download, FileSpreadsheet } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText } from 'lucide-react';
 import { apiGet } from '@/lib/api';
 import { downloadCSV } from '@/lib/csv';
+import { downloadPDF } from '@/lib/pdf';
 
 type ReportKey = 'visits' | 'attendance' | 'compliance' | 'contractors' | 'workers';
 
@@ -130,7 +131,7 @@ export default function ReportsPage() {
     }
   }
 
-  async function handleExport(r: typeof REPORTS[number]) {
+  async function handleExport(r: typeof REPORTS[number], fmt: 'csv' | 'pdf') {
     const cached = previews[r.key];
     const rows = cached ?? (await loadReport(r));
     if (!rows || rows.length === 0) {
@@ -138,7 +139,11 @@ export default function ReportsPage() {
       return;
     }
     const date = new Date().toISOString().slice(0, 10);
-    downloadCSV(`vms-${r.key}-${date}.csv`, rows);
+    if (fmt === 'csv') {
+      downloadCSV(`vms-${r.key}-${date}.csv`, rows);
+    } else {
+      downloadPDF(`vms-${r.key}-${date}.pdf`, r.label, rows);
+    }
   }
 
   if (isLoading || !isAuthenticated) {
@@ -193,11 +198,18 @@ export default function ReportsPage() {
                       {loadingKey === r.key ? 'Loading…' : 'Preview'}
                     </button>
                     <button
-                      onClick={() => handleExport(r)}
+                      onClick={() => handleExport(r, 'csv')}
                       disabled={loadingKey === r.key}
                       className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
                     >
                       <Download className="w-4 h-4" /> CSV
+                    </button>
+                    <button
+                      onClick={() => handleExport(r, 'pdf')}
+                      disabled={loadingKey === r.key}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      <FileText className="w-4 h-4" /> PDF
                     </button>
                   </div>
                 </div>

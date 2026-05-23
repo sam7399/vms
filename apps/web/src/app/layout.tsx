@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
+import { BrandFooter } from "@/components/brand-footer";
 
 export const metadata: Metadata = {
-  title: "VMS Dashboard | Enterprise Visitor Management",
-  description: "Real-time visitor and contractor workforce management",
+  title: "VMS · Enterprise Visitor & Workforce Management",
+  description:
+    "Real-time visitor and contractor workforce management — by TheStudioInfinito × Personify Crafters",
 };
 
 export default function RootLayout({
@@ -19,8 +21,9 @@ export default function RootLayout({
       </head>
       <body suppressHydrationWarning>
         <AuthProvider>
-          <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-            {children}
+          <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+            <div className="flex-1">{children}</div>
+            <BrandFooter />
           </div>
         </AuthProvider>
       </body>

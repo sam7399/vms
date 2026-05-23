@@ -1,64 +1,74 @@
 import { Controller, Get, Post, Put, Body, Param, UseGuards } from '@nestjs/common';
+import { Role } from '@prisma/client';
 import { VisitorsService } from './visitors.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 
 @Controller('visitors')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class VisitorsController {
   constructor(private visitorsService: VisitorsService) {}
 
+  // --- Reads --------------------------------------------------
   @Get()
-  async getVisitors() {
+  getVisitors() {
     return this.visitorsService.getVisitors();
   }
 
   @Get('visits')
-  async getAllVisits() {
+  getAllVisits() {
     return this.visitorsService.getAllVisits();
   }
 
   @Get('headcount')
-  async getHeadcountDefault() {
+  getHeadcountDefault() {
     return this.visitorsService.getLiveHeadcount();
   }
 
-  @Post()
-  async createVisitor(@Body() body: any) {
-    return this.visitorsService.createVisitor(body);
-  }
-
-  @Post('visit')
-  async createVisit(@Body() body: any, @CurrentUser() user: any) {
-    return this.visitorsService.createVisit(body);
-  }
-
   @Get('headcount/:branchId')
-  async getHeadcount(@Param('branchId') branchId: string) {
+  getHeadcount(@Param('branchId') branchId: string) {
     return this.visitorsService.getLiveHeadcount(branchId);
   }
 
   @Get('visit/list/:branchId')
-  async getVisitsByBranch(@Param('branchId') branchId: string) {
+  getVisitsByBranch(@Param('branchId') branchId: string) {
     return this.visitorsService.getAllVisits(branchId);
   }
 
   @Get('visit/:id')
-  async getVisit(@Param('id') id: string) {
+  getVisit(@Param('id') id: string) {
     return this.visitorsService.getVisit(id);
   }
 
+  // --- Writes -------------------------------------------------
+  @Post()
+  @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER, Role.RECEPTIONIST)
+  createVisitor(@Body() body: any) {
+    return this.visitorsService.createVisitor(body);
+  }
+
+  @Post('visit')
+  @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER, Role.RECEPTIONIST, Role.EMPLOYEE)
+  createVisit(@Body() body: any) {
+    return this.visitorsService.createVisit(body);
+  }
+
   @Put('visit/:id/checkin')
-  async checkIn(@Param('id') id: string) {
+  @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER, Role.SECURITY_GUARD, Role.RECEPTIONIST)
+  checkIn(@Param('id') id: string) {
     return this.visitorsService.checkInVisitor(id);
   }
 
   @Put('visit/:id/checkout')
-  async checkOut(@Param('id') id: string) {
+  @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER, Role.SECURITY_GUARD, Role.RECEPTIONIST)
+  checkOut(@Param('id') id: string) {
     return this.visitorsService.checkOutVisitor(id);
   }
 
   @Put('visit/:id/status')
-  async updateStatus(@Param('id') id: string, @Body() body: { status: string }) {
+  @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER)
+  updateStatus(@Param('id') id: string, @Body() body: { status: string }) {
     return this.visitorsService.updateVisitStatus(id, body.status);
   }
 }

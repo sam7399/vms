@@ -85,6 +85,13 @@ export class GateService {
 
     if (!visit) throw new NotFoundException('Invalid QR token');
 
+    // Blacklist check — visitor record OR visit status
+    if (visit.visitor.isBlacklisted) {
+      throw new BadRequestException(
+        `Visitor ${visit.visitor.fullName} is blacklisted — entry denied`,
+      );
+    }
+
     if (visit.status === VisitStatus.CHECKED_IN) {
       return {
         success: true,

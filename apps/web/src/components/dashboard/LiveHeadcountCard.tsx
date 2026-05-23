@@ -16,29 +16,44 @@ interface HeadcountData {
 
 const EMPTY: HeadcountData = { total: 0, visitors: 0, workers: 0, employees: 0 };
 
-export function LiveHeadcountCard() {
+export function LiveHeadcountCard({ branchId = "" }: { branchId?: string }) {
   const [data, setData] = useState<HeadcountData>(EMPTY);
   const [connected, setConnected] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-
-    // Initial fetch in case socket lags
-    apiGet<HeadcountData>("/visitors/headcount")
+  // Refetch the (possibly branch-filtered) endpoint
+  const refetch = () => {
+    const path = branchId
+      ? `/visitors/headcount/${encodeURIComponent(branchId)}`
+      : "/visitors/headcount";
+    apiGet<HeadcountData>(path)
       .then((d) => setData((prev) => ({ ...prev, ...d })))
       .catch(() => {});
+  };
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Refetch whenever the branch filter changes
+  useEffect(() => {
+    refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchId]);
+
+  useEffect(() => {
     const socket: Socket = io(API_URL, { transports: ["websocket", "polling"] });
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
-    socket.on("headcount_update", (d: HeadcountData) => setData(d));
+    // When the server says something changed, re-fetch using current branch filter
+    socket.on("headcount_update", () => refetch());
     socket.emit("request_headcount");
 
     return () => {
       socket.disconnect();
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchId]);
 
   const cards = [
     { label: "Total Inside", count: data.total, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },

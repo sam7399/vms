@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -11,6 +12,9 @@ async function bootstrap() {
 
   // Global exception filter
   app.useGlobalFilters(new HttpExceptionFilter());
+
+  // Audit every write
+  app.useGlobalInterceptors(new AuditInterceptor());
 
   // CORS — supports comma-separated list of origins via CORS_ORIGIN env
   const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')

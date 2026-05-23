@@ -177,3 +177,21 @@ model Attendance {
   @@index([branchId])
   @@index([checkIn])
 }
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?  @db.VarChar(100)   // userId from JWT, or null for anon
+  actorEmail String?  @db.VarChar(255)
+  actorRole  String?  @db.VarChar(50)
+  method     String   @db.VarChar(10)
+  path       String   @db.VarChar(500)
+  status     Int
+  ipAddress  String?  @db.VarChar(64)
+  userAgent  String?  @db.VarChar(500)
+  durationMs Int
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([createdAt])
+  @@index([path])
+}

@@ -66,7 +66,7 @@ function StatusIcon({ status }: { status: VisitStatus }) {
   }
 }
 
-export function VisitorsTable() {
+export function VisitorsTable({ branchId = "" }: { branchId?: string }) {
   const [visits, setVisits] = useState<ApiVisit[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,7 +74,10 @@ export function VisitorsTable() {
     let cancelled = false;
     async function load() {
       try {
-        const data = await apiGet<ApiVisit[]>("/visitors/visits");
+        const path = branchId
+          ? `/visitors/visit/list/${encodeURIComponent(branchId)}`
+          : "/visitors/visits";
+        const data = await apiGet<ApiVisit[]>(path);
         if (!cancelled) setVisits(data);
       } catch (e) {
         if (!cancelled)
@@ -87,7 +90,7 @@ export function VisitorsTable() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [branchId]);
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden">
