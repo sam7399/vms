@@ -36,18 +36,22 @@ export class HeadcountGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   private async calculateHeadcount() {
-    const visits = await prisma.visit.findMany({
-      where: { status: VisitStatus.CHECKED_IN },
-      include: { visitor: true },
-    });
+    const [activeVisits, activeWorkers] = await Promise.all([
+      prisma.visit.findMany({
+        where: { status: VisitStatus.CHECKED_IN, actualExit: null },
+        select: { id: true, visitor: { select: { company: true } } },
+      }),
+      prisma.attendance.count({ where: { checkOut: null } }),
+    ]);
 
-    const checkedIn = visits.filter((v: any) => v.actualEntry && !v.actualExit);
+    const visitors = activeVisits.filter((v) => v.visitor.company).length;
+    const employees = activeVisits.filter((v) => !v.visitor.company).length;
 
     return {
-      total: checkedIn.length,
-      visitors: checkedIn.filter((v: any) => v.visitor.company).length,
-      workers: 0,
-      employees: checkedIn.filter((v: any) => !v.visitor.company).length,
+      total: visitors + employees + activeWorkers,
+      visitors,
+      workers: activeWorkers,
+      employees,
       timestamp: new Date().toISOString(),
     };
   }

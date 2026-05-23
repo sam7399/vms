@@ -63,6 +63,18 @@ export function DashboardHeader() {
           >
             Contractors
           </Link>
+          <Link
+            href="/workers"
+            className="px-4 py-2 rounded-t-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            Workers
+          </Link>
+          <Link
+            href="/reports"
+            className="px-4 py-2 rounded-t-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            Reports
+          </Link>
         </nav>
       </div>
     </header>

@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaClient, VisitStatus } from '@prisma/client';
 import * as crypto from 'crypto';
+import { HeadcountGateway } from '../../gateways/headcount.gateway';
 
 const prisma = new PrismaClient();
 
 @Injectable()
 export class VisitorsService {
+  constructor(private readonly headcount: HeadcountGateway) {}
+
   async createVisit(data: any) {
     const qrToken = crypto.randomBytes(16).toString('hex');
 
@@ -52,23 +55,21 @@ export class VisitorsService {
   }
 
   async checkInVisitor(visitId: string) {
-    return prisma.visit.update({
+    const v = await prisma.visit.update({
       where: { id: visitId },
-      data: {
-        status: VisitStatus.CHECKED_IN,
-        actualEntry: new Date(),
-      },
+      data: { status: VisitStatus.CHECKED_IN, actualEntry: new Date() },
     });
+    this.headcount.broadcastHeadcountUpdate().catch(() => {});
+    return v;
   }
 
   async checkOutVisitor(visitId: string) {
-    return prisma.visit.update({
+    const v = await prisma.visit.update({
       where: { id: visitId },
-      data: {
-        status: VisitStatus.CHECKED_OUT,
-        actualExit: new Date(),
-      },
+      data: { status: VisitStatus.CHECKED_OUT, actualExit: new Date() },
     });
+    this.headcount.broadcastHeadcountUpdate().catch(() => {});
+    return v;
   }
 
   async createVisitor(data: any) {
@@ -91,22 +92,29 @@ export class VisitorsService {
   }
 
   async getLiveHeadcount(branchId?: string) {
-    const where = branchId
-      ? { branchId, status: VisitStatus.CHECKED_IN }
-      : { status: VisitStatus.CHECKED_IN };
+    const visitWhere = branchId
+      ? { branchId, status: VisitStatus.CHECKED_IN, actualExit: null }
+      : { status: VisitStatus.CHECKED_IN, actualExit: null };
+    const attendanceWhere = branchId
+      ? { branchId, checkOut: null }
+      : { checkOut: null };
 
-    const visits = await prisma.visit.findMany({
-      where,
-      include: { visitor: true },
-    });
+    const [activeVisits, workers] = await Promise.all([
+      prisma.visit.findMany({
+        where: visitWhere,
+        select: { id: true, visitor: { select: { company: true } } },
+      }),
+      prisma.attendance.count({ where: attendanceWhere }),
+    ]);
 
-    const checkedInVisitors = visits.filter((v: any) => v.actualEntry && !v.actualExit);
+    const visitors = activeVisits.filter((v) => v.visitor.company).length;
+    const employees = activeVisits.filter((v) => !v.visitor.company).length;
 
     return {
-      total: checkedInVisitors.length,
-      visitors: checkedInVisitors.filter((v: any) => v.visitor.company).length,
-      workers: 0,
-      employees: checkedInVisitors.filter((v: any) => !v.visitor.company).length,
+      total: visitors + employees + workers,
+      visitors,
+      workers,
+      employees,
     };
   }
 }

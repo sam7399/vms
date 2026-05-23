@@ -47,76 +47,25 @@ export function clearAuth(): void {
   localStorage.removeItem(USER_KEY);
 }
 
-// Mock login (will be replaced with real API call in Phase 3)
-export async function mockLogin(email: string, password: string): Promise<AuthResponse> {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500));
+import { apiPost } from './api';
 
-  // Mock user data
-  const mockUsers: Record<string, { password: string; user: AuthUser }> = {
-    'admin@vms.com': {
-      password: 'admin123',
-      user: {
-        id: '1',
-        email: 'admin@vms.com',
-        fullName: 'Admin User',
-        role: 'SUPER_ADMIN',
-        branchId: 'branch-1',
-      },
-    },
-    'hr@vms.com': {
-      password: 'hr123',
-      user: {
-        id: '2',
-        email: 'hr@vms.com',
-        fullName: 'HR Manager',
-        role: 'HR_MANAGER',
-        branchId: 'branch-1',
-      },
-    },
-    'security@vms.com': {
-      password: 'security123',
-      user: {
-        id: '3',
-        email: 'security@vms.com',
-        fullName: 'Security Guard',
-        role: 'SECURITY_GUARD',
-        branchId: 'branch-1',
-      },
-    },
-  };
-
-  const account = mockUsers[email];
-  if (!account || account.password !== password) {
-    throw new Error('Invalid email or password');
-  }
-
-  return {
-    accessToken: `mock_token_${Date.now()}`,
-    user: account.user,
-  };
+export async function apiLogin(email: string, password: string): Promise<AuthResponse> {
+  return apiPost<AuthResponse>('/auth/login', { email, password });
 }
 
-// Mock signup (will be replaced with real API call in Phase 3)
-export async function mockSignup(
+export async function apiSignup(
   email: string,
   password: string,
-  fullName: string
+  fullName: string,
+  branchId: string
 ): Promise<AuthResponse> {
-  await new Promise(resolve => setTimeout(resolve, 500));
-
   if (password.length < 6) {
     throw new Error('Password must be at least 6 characters');
   }
-
-  return {
-    accessToken: `mock_token_${Date.now()}`,
-    user: {
-      id: `user_${Date.now()}`,
-      email,
-      fullName,
-      role: 'EMPLOYEE',
-      branchId: 'branch-1',
-    },
-  };
+  return apiPost<AuthResponse>('/auth/register', {
+    email,
+    password,
+    fullName,
+    branchId,
+  });
 }

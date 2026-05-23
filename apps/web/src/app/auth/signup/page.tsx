@@ -1,19 +1,33 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import Link from 'next/link';
+import { apiGet } from '@/lib/api';
+
+interface Branch { id: string; name: string; location: string }
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [branchId, setBranchId] = useState('');
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { signup } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    apiGet<Branch[]>('/admin/branches')
+      .then((bs) => {
+        setBranches(bs);
+        if (bs.length === 1) setBranchId(bs[0].id);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,11 +37,15 @@ export default function SignupPage() {
       setError('Passwords do not match');
       return;
     }
+    if (!branchId) {
+      setError('Please select a branch');
+      return;
+    }
 
     setIsLoading(true);
 
     try {
-      await signup(email, password, fullName);
+      await signup(email, password, fullName, branchId);
       router.push('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed');
@@ -116,6 +134,27 @@ export default function SignupPage() {
                 required
                 className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
               />
+            </div>
+
+            <div>
+              <label htmlFor="branch" className="block text-sm font-medium text-white mb-2">
+                Branch
+              </label>
+              <select
+                id="branch"
+                value={branchId}
+                onChange={(e) => setBranchId(e.target.value)}
+                disabled={isLoading || branches.length === 0}
+                required
+                className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                <option value="">— Select branch —</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} — {b.location}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <button

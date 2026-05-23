@@ -1,10 +1,13 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaClient, VisitStatus } from '@prisma/client';
+import { HeadcountGateway } from '../../gateways/headcount.gateway';
 
 const prisma = new PrismaClient();
 
 @Injectable()
 export class GateService {
+  constructor(private readonly headcount: HeadcountGateway) {}
+
   // Mock face embedding comparison (in production, use TensorFlow/OpenCV)
   private compareFaceEmbeddings(embedding1: any, embedding2: any): number {
     if (!embedding1 || !embedding2) return 0;
@@ -103,6 +106,9 @@ export class GateService {
         actualEntry: new Date(),
       },
     });
+
+    // Fire-and-forget headcount broadcast
+    this.headcount.broadcastHeadcountUpdate().catch(() => {});
 
     return {
       success: true,

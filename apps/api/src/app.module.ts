@@ -4,7 +4,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { VisitorsModule } from './modules/visitors/visitors.module';
 import { GateModule } from './modules/gate/gate.module';
 import { ComplianceModule } from './modules/compliance/compliance.module';
-import { HeadcountGateway } from './gateways/headcount.gateway';
+import { AdminModule } from './modules/admin/admin.module';
+import { HeadcountModule } from './gateways/headcount.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -14,12 +15,13 @@ import { HealthController } from './health.controller';
       envFilePath: ['.env.local', '.env'],
       ignoreEnvFile: process.env.NODE_ENV === 'production',
     }),
+    HeadcountModule,
     AuthModule,
     VisitorsModule,
     GateModule,
     ComplianceModule,
+    AdminModule,
   ],
   controllers: [HealthController],
-  providers: [HeadcountGateway],
 })
 export class AppModule {}

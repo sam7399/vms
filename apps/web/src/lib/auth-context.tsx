@@ -1,14 +1,14 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { AuthUser, setAuth, clearAuth, getToken, getUser } from '@/lib/auth';
+import { AuthUser, setAuth, clearAuth, getUser, apiLogin, apiSignup } from '@/lib/auth';
 
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, fullName: string) => Promise<void>;
+  signup: (email: string, password: string, fullName: string, branchId: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -18,20 +18,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize auth from localStorage on mount
   useEffect(() => {
     const savedUser = getUser();
-    if (savedUser) {
-      setUser(savedUser);
-    }
+    if (savedUser) setUser(savedUser);
     setIsLoading(false);
   }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const { mockLogin } = await import('@/lib/auth');
-      const response = await mockLogin(email, password);
+      const response = await apiLogin(email, password);
       setAuth(response.accessToken, response.user);
       setUser(response.user);
     } finally {
@@ -39,11 +35,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signup = async (email: string, password: string, fullName: string) => {
+  const signup = async (
+    email: string,
+    password: string,
+    fullName: string,
+    branchId: string
+  ) => {
     setIsLoading(true);
     try {
-      const { mockSignup } = await import('@/lib/auth');
-      const response = await mockSignup(email, password, fullName);
+      const response = await apiSignup(email, password, fullName, branchId);
       setAuth(response.accessToken, response.user);
       setUser(response.user);
     } finally {

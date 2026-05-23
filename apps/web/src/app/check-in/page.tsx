@@ -1,251 +1,319 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
-import { QrCode, CheckCircle, AlertCircle } from 'lucide-react';
+import { QrCode, CheckCircle, AlertCircle, Copy } from 'lucide-react';
+import { apiGet, apiPost } from '@/lib/api';
 
-interface VisitFormData {
-  visitorName: string;
-  visitorPhone: string;
-  visitorEmail: string;
-  visitorCompany: string;
-  purpose: string;
-  hostName: string;
-  vehicleNumber: string;
+interface Branch { id: string; name: string; location: string }
+interface Host { id: string; fullName: string; email: string; role: string; branchId: string }
+interface Visitor { id: string; fullName: string; phone: string }
+
+interface VisitResponse {
+  id: string;
+  qrCodeToken: string;
+  status: string;
+}
+
+interface VisitorResponse {
+  id: string;
 }
 
 export default function CheckInPage() {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
-  const [formData, setFormData] = useState<VisitFormData>({
+
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [hosts, setHosts] = useState<Host[]>([]);
+
+  const [form, setForm] = useState({
     visitorName: '',
     visitorPhone: '',
     visitorEmail: '',
     visitorCompany: '',
+    documentType: 'AADHAAR',
+    documentNumber: '',
     purpose: '',
-    hostName: '',
+    branchId: '',
+    hostId: '',
     vehicleNumber: '',
+    expectedEntry: '',
   });
 
   const [qrToken, setQrToken] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [visitId, setVisitId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) router.push('/auth/login');
+  }, [isLoading, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    Promise.all([
+      apiGet<Branch[]>('/admin/branches'),
+      apiGet<Host[]>('/admin/hosts'),
+    ])
+      .then(([bs, hs]) => {
+        setBranches(bs);
+        setHosts(hs);
+        if (bs.length === 1) setForm((f) => ({ ...f, branchId: bs[0].id }));
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load form data'));
+  }, [isAuthenticated]);
+
+  function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError('');
+    setQrToken(null);
+    try {
+      const visitor = await apiPost<VisitorResponse>('/visitors', {
+        fullName: form.visitorName,
+        phone: form.visitorPhone,
+        email: form.visitorEmail || undefined,
+        company: form.visitorCompany || undefined,
+        documentType: form.documentType,
+        documentNumber: form.documentNumber,
+      });
+
+      const visit = await apiPost<VisitResponse>('/visitors/visit', {
+        visitorId: visitor.id,
+        branchId: form.branchId,
+        hostId: form.hostId,
+        purpose: form.purpose,
+        expectedEntry: form.expectedEntry || new Date().toISOString(),
+        vehicleNumber: form.vehicleNumber || undefined,
+      });
+
+      setQrToken(visit.qrCodeToken);
+      setVisitId(visit.id);
+      setForm({
+        ...form,
+        visitorName: '',
+        visitorPhone: '',
+        visitorEmail: '',
+        visitorCompany: '',
+        documentNumber: '',
+        purpose: '',
+        vehicleNumber: '',
+        expectedEntry: '',
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create visit');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (isLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-zinc-400">Loading...</div>
+        <div className="text-zinc-400">Loading…</div>
       </div>
     );
   }
-
-  if (!isAuthenticated) {
-    router.push('/auth/login');
-    return null;
-  }
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsSubmitting(true);
-
-    try {
-      // Mock QR token generation
-      const token = `VMS_${Date.now()}_${Math.random().toString(36).substring(7)}`.toUpperCase();
-      setQrToken(token);
-      
-      // Reset form
-      setTimeout(() => {
-        setFormData({
-          visitorName: '',
-          visitorPhone: '',
-          visitorEmail: '',
-          visitorCompany: '',
-          purpose: '',
-          hostName: '',
-          vehicleNumber: '',
-        });
-        setQrToken(null);
-      }, 3000);
-    } catch (err) {
-      setError('Failed to create visit');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <main className="min-h-screen">
       <DashboardHeader />
 
-      <div className="max-w-4xl mx-auto px-6 py-12">
+      <div className="max-w-5xl mx-auto px-6 py-12">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-white mb-2">Visitor Check-In</h2>
-          <p className="text-zinc-400">Register a new visitor or contractor</p>
+          <h2 className="text-3xl font-bold text-white mb-2">Pre-Register Visit</h2>
+          <p className="text-zinc-400">
+            Create a visitor + visit and get a QR token to share for gate check-in
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Form */}
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
-            <form onSubmit={handleSubmit} className="space-y-4">
+          <form
+            onSubmit={handleSubmit}
+            className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl space-y-4"
+          >
+            <div>
+              <label className="block text-xs text-zinc-400 mb-1">Visitor name *</label>
+              <input
+                type="text"
+                required
+                value={form.visitorName}
+                onChange={(e) => set('visitorName', e.target.value)}
+                className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-white mb-2">
-                  Visitor Name *
-                </label>
+                <label className="block text-xs text-zinc-400 mb-1">Phone *</label>
+                <input
+                  type="tel"
+                  required
+                  value={form.visitorPhone}
+                  onChange={(e) => set('visitorPhone', e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={form.visitorEmail}
+                  onChange={(e) => set('visitorEmail', e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Company</label>
                 <input
                   type="text"
-                  name="visitorName"
-                  value={formData.visitorName}
-                  onChange={handleChange}
-                  required
-                  placeholder="John Doe"
+                  value={form.visitorCompany}
+                  onChange={(e) => set('visitorCompany', e.target.value)}
                   className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-white mb-2">
-                    Phone *
-                  </label>
-                  <input
-                    type="tel"
-                    name="visitorPhone"
-                    value={formData.visitorPhone}
-                    onChange={handleChange}
-                    required
-                    placeholder="+1 234 567 8900"
-                    className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-white mb-2">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    name="visitorEmail"
-                    value={formData.visitorEmail}
-                    onChange={handleChange}
-                    placeholder="john@example.com"
-                    className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
               <div>
-                <label className="block text-sm font-medium text-white mb-2">
-                  Company
-                </label>
+                <label className="block text-xs text-zinc-400 mb-1">Vehicle number</label>
                 <input
                   type="text"
-                  name="visitorCompany"
-                  value={formData.visitorCompany}
-                  onChange={handleChange}
-                  placeholder="Acme Corp"
+                  value={form.vehicleNumber}
+                  onChange={(e) => set('vehicleNumber', e.target.value)}
                   className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-white mb-2">
-                  Purpose of Visit *
-                </label>
-                <textarea
-                  name="purpose"
-                  value={formData.purpose}
-                  onChange={handleChange}
+                <label className="block text-xs text-zinc-400 mb-1">Document type</label>
+                <select
+                  value={form.documentType}
+                  onChange={(e) => set('documentType', e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="AADHAAR">Aadhaar</option>
+                  <option value="PAN">PAN</option>
+                  <option value="PASSPORT">Passport</option>
+                  <option value="DRIVING_LICENSE">Driving Licence</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Document number *</label>
+                <input
+                  type="text"
                   required
-                  placeholder="Meeting with Mr. Smith"
-                  rows={3}
+                  value={form.documentNumber}
+                  onChange={(e) => set('documentNumber', e.target.value)}
                   className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-white mb-2">
-                    Host Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="hostName"
-                    value={formData.hostName}
-                    onChange={handleChange}
-                    required
-                    placeholder="John Smith"
-                    className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-white mb-2">
-                    Vehicle Number
-                  </label>
-                  <input
-                    type="text"
-                    name="vehicleNumber"
-                    value={formData.vehicleNumber}
-                    onChange={handleChange}
-                    placeholder="ABC-1234"
-                    className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+            </div>
+            <div>
+              <label className="block text-xs text-zinc-400 mb-1">Purpose *</label>
+              <textarea
+                required
+                rows={2}
+                value={form.purpose}
+                onChange={(e) => set('purpose', e.target.value)}
+                className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Branch *</label>
+                <select
+                  required
+                  value={form.branchId}
+                  onChange={(e) => set('branchId', e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Branch --</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} — {b.location}
+                    </option>
+                  ))}
+                </select>
               </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Host *</label>
+                <select
+                  required
+                  value={form.hostId}
+                  onChange={(e) => set('hostId', e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Host --</option>
+                  {hosts.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.fullName} ({h.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-zinc-400 mb-1">Expected entry</label>
+              <input
+                type="datetime-local"
+                value={form.expectedEntry}
+                onChange={(e) => set('expectedEntry', e.target.value)}
+                className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
-              {error && (
-                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-200 text-sm">
-                  {error}
-                </div>
-              )}
+            {error && (
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-200 text-sm">
+                {error}
+              </div>
+            )}
 
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? 'Creating visit...' : 'Generate QR Code'}
-              </button>
-            </form>
-          </div>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors disabled:opacity-50"
+            >
+              {submitting ? 'Creating visit…' : 'Create Visit + Generate QR'}
+            </button>
+          </form>
 
-          {/* QR Code Display */}
-          <div className="flex flex-col gap-4">
+          <div>
             {qrToken ? (
-              <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-8 backdrop-blur-xl flex flex-col items-center justify-center h-full">
-                <CheckCircle className="w-16 h-16 text-green-400 mb-4" />
-                <h3 className="text-2xl font-bold text-white mb-2">Visit Created!</h3>
-                <p className="text-zinc-400 text-center mb-6">QR Code generated successfully</p>
-                
-                <div className="bg-white/10 border border-white/20 rounded-xl p-6 mb-6 w-full">
-                  <div className="bg-white aspect-square rounded-lg flex items-center justify-center">
-                    <div className="text-center">
-                      <QrCode className="w-32 h-32 text-slate-900 mx-auto" />
-                      <p className="text-xs text-slate-600 mt-2 font-mono">{qrToken}</p>
-                    </div>
-                  </div>
+              <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-8 backdrop-blur-xl">
+                <div className="flex items-center gap-3 mb-4">
+                  <CheckCircle className="w-8 h-8 text-green-400" />
+                  <h3 className="text-2xl font-bold text-white">Visit created</h3>
                 </div>
-
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 w-full">
-                  <p className="text-sm text-blue-200">
-                    <strong>Token:</strong> {qrToken}
-                  </p>
-                  <p className="text-xs text-blue-300 mt-2">
-                    This QR code can be scanned at entry points
-                  </p>
+                <div className="bg-white aspect-square rounded-lg flex items-center justify-center mb-4">
+                  <QrCode className="w-40 h-40 text-slate-900" />
                 </div>
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 flex items-center justify-between gap-3">
+                  <p className="text-sm font-mono text-blue-100 break-all">{qrToken}</p>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(qrToken)}
+                    className="p-2 rounded hover:bg-blue-500/20 text-blue-300"
+                    title="Copy token"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                </div>
+                <p className="text-xs text-zinc-400 mt-3">
+                  Share this token with the visitor — they enter it at the kiosk or in the mobile app.
+                  Visit ID: <span className="font-mono">{visitId}</span>
+                </p>
               </div>
             ) : (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl h-full flex flex-col items-center justify-center">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl h-full flex flex-col items-center justify-center text-center">
                 <AlertCircle className="w-16 h-16 text-zinc-400 mb-4" />
-                <p className="text-zinc-400 text-center">
-                  Fill out the form and click "Generate QR Code" to create a visit
+                <p className="text-zinc-400">
+                  Fill out the form and submit to create a visit and get a QR token.
                 </p>
               </div>
             )}
