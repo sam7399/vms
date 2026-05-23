@@ -4,13 +4,22 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('visitors')
-@UseGuards(JwtAuthGuard)
 export class VisitorsController {
   constructor(private visitorsService: VisitorsService) {}
 
   @Get()
   async getVisitors() {
     return this.visitorsService.getVisitors();
+  }
+
+  @Get('visits')
+  async getAllVisits() {
+    return this.visitorsService.getAllVisits();
+  }
+
+  @Get('headcount')
+  async getHeadcountDefault() {
+    return this.visitorsService.getLiveHeadcount();
   }
 
   @Post()

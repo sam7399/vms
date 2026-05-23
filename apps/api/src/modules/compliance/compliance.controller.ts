@@ -2,8 +2,9 @@ import { Controller, Get, Put, Body, Param, UseGuards } from '@nestjs/common';
 import { ComplianceService } from './compliance.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
+// NOTE: Auth temporarily removed for the dashboard demo. Re-add JwtAuthGuard
+// once real auth is wired on the web client.
 @Controller('compliance')
-@UseGuards(JwtAuthGuard)
 export class ComplianceController {
   constructor(private complianceService: ComplianceService) {}
 

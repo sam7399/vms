@@ -1,44 +1,57 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Clock, CheckCircle, XCircle, Hourglass } from "lucide-react";
+import { Clock, CheckCircle, XCircle, Hourglass, AlertCircle } from "lucide-react";
+import { apiGet } from "@/lib/api";
 
-interface Visit {
+type VisitStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "CHECKED_IN"
+  | "CHECKED_OUT"
+  | "REJECTED"
+  | "BLACKLISTED";
+
+interface ApiVisit {
   id: string;
-  visitorName: string;
-  host: string;
-  status: "PENDING" | "APPROVED" | "CHECKED_IN" | "CHECKED_OUT" | "REJECTED";
+  status: VisitStatus;
   expectedEntry: string;
-  actualEntry?: string;
+  actualEntry: string | null;
+  visitor: { fullName: string; company: string | null };
+  host: { fullName: string; email: string };
 }
 
-const mockVisits: Visit[] = [
-  {
-    id: "v1",
-    visitorName: "John Smith",
-    host: "Sarah Johnson (HR)",
-    status: "APPROVED",
-    expectedEntry: "2025-05-22 10:00 AM",
-    actualEntry: "2025-05-22 09:55 AM",
-  },
-  {
-    id: "v2",
-    visitorName: "Emily Davis",
-    host: "Mike Chen (Engineering)",
-    status: "PENDING",
-    expectedEntry: "2025-05-22 11:30 AM",
-  },
-  {
-    id: "v3",
-    visitorName: "Robert Wilson",
-    host: "Lisa Anderson (Finance)",
-    status: "CHECKED_IN",
-    expectedEntry: "2025-05-22 02:00 PM",
-    actualEntry: "2025-05-22 01:58 PM",
-  },
-];
+function formatDate(iso: string | null | undefined) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
-function getStatusIcon(status: Visit["status"]) {
+function StatusBadge({ status }: { status: VisitStatus }) {
+  const colorMap: Record<VisitStatus, string> = {
+    APPROVED: "bg-green-500/10 text-green-400",
+    PENDING: "bg-yellow-500/10 text-yellow-400",
+    CHECKED_IN: "bg-blue-500/10 text-blue-400",
+    CHECKED_OUT: "bg-gray-500/10 text-gray-300",
+    REJECTED: "bg-red-500/10 text-red-400",
+    BLACKLISTED: "bg-red-500/10 text-red-400",
+  };
+  return (
+    <span
+      className={`px-3 py-1 rounded-full text-xs font-medium ${colorMap[status]}`}
+    >
+      {status.replace(/_/g, " ")}
+    </span>
+  );
+}
+
+function StatusIcon({ status }: { status: VisitStatus }) {
   switch (status) {
     case "APPROVED":
       return <CheckCircle className="w-5 h-5 text-green-500" />;
@@ -53,51 +66,84 @@ function getStatusIcon(status: Visit["status"]) {
   }
 }
 
-function getStatusColor(status: Visit["status"]) {
-  switch (status) {
-    case "APPROVED":
-      return "bg-green-500/10 text-green-500";
-    case "PENDING":
-      return "bg-yellow-500/10 text-yellow-500";
-    case "CHECKED_IN":
-      return "bg-blue-500/10 text-blue-500";
-    case "CHECKED_OUT":
-      return "bg-gray-500/10 text-gray-500";
-    default:
-      return "bg-red-500/10 text-red-500";
-  }
-}
-
 export function VisitorsTable() {
+  const [visits, setVisits] = useState<ApiVisit[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await apiGet<ApiVisit[]>("/visitors/visits");
+        if (!cancelled) setVisits(data);
+      } catch (e) {
+        if (!cancelled)
+          setError(e instanceof Error ? e.message : "Failed to load visits");
+      }
+    }
+    load();
+    const interval = setInterval(load, 15_000); // refresh every 15s
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden">
-      <div className="px-6 py-4 border-b border-white/10">
-        <h3 className="text-lg font-semibold text-white">Today's Visitors</h3>
+      <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-white">Recent Visits</h3>
+        {visits && (
+          <span className="text-xs text-zinc-400">{visits.length} total</span>
+        )}
       </div>
-      <div className="divide-y divide-white/10">
-        {mockVisits.map((visit, index) => (
+
+      {error && (
+        <div className="px-6 py-4 flex items-center gap-2 text-red-400 text-sm">
+          <AlertCircle className="w-4 h-4" /> {error}
+        </div>
+      )}
+
+      {!visits && !error && (
+        <div className="px-6 py-8 text-center text-zinc-500 text-sm">Loading…</div>
+      )}
+
+      {visits && visits.length === 0 && (
+        <div className="px-6 py-8 text-center text-zinc-500 text-sm">
+          No visits yet. Create one via the API or seed the database.
+        </div>
+      )}
+
+      <div className="divide-y divide-white/10 max-h-[480px] overflow-y-auto">
+        {visits?.map((visit, index) => (
           <motion.div
             key={visit.id}
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.1 }}
+            transition={{ delay: Math.min(index * 0.04, 0.4) }}
             className="px-6 py-4 hover:bg-white/5 transition-colors"
           >
             <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h4 className="font-medium text-white">{visit.visitorName}</h4>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(visit.status)}`}>
-                    {visit.status.replace(/_/g, " ")}
-                  </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
+                  <h4 className="font-medium text-white truncate">
+                    {visit.visitor.fullName}
+                  </h4>
+                  <StatusBadge status={visit.status} />
                 </div>
-                <p className="text-sm text-zinc-400">Meeting: {visit.host}</p>
+                <p className="text-sm text-zinc-400">
+                  Host: {visit.host.fullName}
+                  {visit.visitor.company && ` • ${visit.visitor.company}`}
+                </p>
                 <p className="text-xs text-zinc-500 mt-1">
-                  Expected: {visit.expectedEntry}
-                  {visit.actualEntry && ` • Arrived: ${visit.actualEntry}`}
+                  Expected: {formatDate(visit.expectedEntry)}
+                  {visit.actualEntry &&
+                    ` • Arrived: ${formatDate(visit.actualEntry)}`}
                 </p>
               </div>
-              <div className="ml-4">{getStatusIcon(visit.status)}</div>
+              <div className="ml-4 shrink-0">
+                <StatusIcon status={visit.status} />
+              </div>
             </div>
           </motion.div>
         ))}
