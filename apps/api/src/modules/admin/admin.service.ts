@@ -30,9 +30,21 @@ export class AdminService {
         phone: true,
         email: true,
         company: true,
+        documentType: true,
+        documentNumber: true,
         isBlacklisted: true,
+        createdAt: true,
+        _count: { select: { visits: true } },
       },
       orderBy: { fullName: 'asc' },
+    });
+  }
+
+  async setVisitorBlacklist(id: string, blacklist: boolean) {
+    return prisma.visitor.update({
+      where: { id },
+      data: { isBlacklisted: blacklist },
+      select: { id: true, fullName: true, isBlacklisted: true },
     });
   }
 

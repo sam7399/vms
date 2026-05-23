@@ -60,4 +60,14 @@ export class HeadcountGateway implements OnGatewayConnection, OnGatewayDisconnec
     const headcount = await this.calculateHeadcount();
     this.server.emit('headcount_update', headcount);
   }
+
+  /** Push a one-off notification to all connected dashboards. */
+  broadcastNotification(payload: {
+    kind: 'walk-in' | 'approval' | 'check-in' | 'check-out';
+    title: string;
+    body?: string;
+    visitId?: string;
+  }) {
+    this.server.emit('notification', { ...payload, ts: new Date().toISOString() });
+  }
 }

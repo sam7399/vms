@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -64,5 +64,11 @@ export class AdminController {
   @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN)
   createHost(@Body() body: any) {
     return this.admin.createHost(body);
+  }
+
+  @Put('visitors/:id/blacklist')
+  @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER, Role.SECURITY_GUARD)
+  setBlacklist(@Param('id') id: string, @Body() body: { blacklist: boolean }) {
+    return this.admin.setVisitorBlacklist(id, !!body?.blacklist);
   }
 }

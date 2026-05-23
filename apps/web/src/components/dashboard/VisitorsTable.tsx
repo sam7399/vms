@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Clock, CheckCircle, XCircle, Hourglass, AlertCircle, LogIn, LogOut } from "lucide-react";
+import { Clock, CheckCircle, XCircle, Hourglass, AlertCircle, LogIn, LogOut, Search } from "lucide-react";
 import { apiGet, apiPut } from "@/lib/api";
 
 type VisitStatus =
@@ -70,6 +70,7 @@ export function VisitorsTable({ branchId = "" }: { branchId?: string }) {
   const [visits, setVisits] = useState<ApiVisit[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   async function load() {
     try {
@@ -90,6 +91,18 @@ export function VisitorsTable({ branchId = "" }: { branchId?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branchId]);
 
+  const filteredVisits = useMemo(() => {
+    if (!visits) return null;
+    const q = search.trim().toLowerCase();
+    if (!q) return visits;
+    return visits.filter((v) =>
+      v.visitor.fullName.toLowerCase().includes(q) ||
+      (v.visitor.company && v.visitor.company.toLowerCase().includes(q)) ||
+      v.host.fullName.toLowerCase().includes(q) ||
+      v.status.toLowerCase().includes(q)
+    );
+  }, [visits, search]);
+
   async function checkInOut(id: string, action: "checkin" | "checkout") {
     setBusyId(id);
     setError(null);
@@ -105,11 +118,23 @@ export function VisitorsTable({ branchId = "" }: { branchId?: string }) {
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden">
-      <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+      <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between gap-3 flex-wrap">
         <h3 className="text-lg font-semibold text-white">Recent Visits</h3>
-        {visits && (
-          <span className="text-xs text-zinc-400">{visits.length} total</span>
-        )}
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search…"
+              className="pl-8 pr-3 py-1.5 text-xs rounded-lg bg-white/5 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-blue-500 w-40"
+            />
+          </div>
+          {visits && (
+            <span className="text-xs text-zinc-400">{visits.length} total</span>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -129,7 +154,7 @@ export function VisitorsTable({ branchId = "" }: { branchId?: string }) {
       )}
 
       <div className="divide-y divide-white/10 max-h-[480px] overflow-y-auto">
-        {visits?.map((visit, index) => (
+        {filteredVisits?.map((visit, index) => (
           <motion.div
             key={visit.id}
             initial={{ opacity: 0, x: -20 }}

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { BrandFooter } from "@/components/brand-footer";
+import { NotificationToaster } from "@/components/notification-toaster";
 
 export const metadata: Metadata = {
   title: "VMS · Enterprise Visitor & Workforce Management",
@@ -25,6 +26,7 @@ export default function RootLayout({
             <div className="flex-1">{children}</div>
             <BrandFooter />
           </div>
+          <NotificationToaster />
         </AuthProvider>
       </body>
     </html>

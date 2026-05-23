@@ -2,12 +2,16 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { DocumentType, PrismaClient, VisitStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { HeadcountGateway } from '../../gateways/headcount.gateway';
 
 const prisma = new PrismaClient();
 
 @Injectable()
 export class PublicService {
-  constructor(private readonly notifications: NotificationsService) {}
+  constructor(
+    private readonly notifications: NotificationsService,
+    private readonly headcount: HeadcountGateway,
+  ) {}
 
   listBranches() {
     return prisma.branch.findMany({
@@ -106,6 +110,14 @@ export class PublicService {
         })
         .catch(() => {});
     }
+
+    // Real-time push to all connected dashboards
+    this.headcount.broadcastNotification({
+      kind: 'walk-in',
+      title: `${visit.visitor.fullName} just walked in`,
+      body: `${data.purpose} · host ${visit.host.fullName}`,
+      visitId: visit.id,
+    });
 
     return {
       visitId: visit.id,

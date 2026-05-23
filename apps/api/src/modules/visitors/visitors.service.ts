@@ -147,6 +147,16 @@ export class VisitorsService {
         .catch(() => {});
     }
 
+    // Real-time push to dashboards
+    if (status === 'APPROVED' || status === 'REJECTED') {
+      this.headcount.broadcastNotification({
+        kind: 'approval',
+        title: `${updated.visitor.fullName} ${status.toLowerCase()}`,
+        body: `Host: ${updated.host.fullName}`,
+        visitId: updated.id,
+      });
+    }
+
     return updated;
   }
 
