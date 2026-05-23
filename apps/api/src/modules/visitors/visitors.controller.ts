@@ -26,6 +26,11 @@ export class VisitorsController {
     return this.visitorsService.getPendingVisits();
   }
 
+  @Get('vehicles')
+  listVehicles() {
+    return this.visitorsService.listVehicles();
+  }
+
   @Get('headcount')
   getHeadcountDefault() {
     return this.visitorsService.getLiveHeadcount();

@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
-import { CheckCircle, AlertCircle, Copy, Camera, X } from 'lucide-react';
+import { CheckCircle, AlertCircle, Copy, Camera, Download, Share2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { apiGet, apiPost } from '@/lib/api';
 import { WebcamCapture } from '@/components/webcam-capture';
+import { downloadBadgePDF } from '@/lib/badge';
 
 interface Branch { id: string; name: string; location: string }
 interface Host { id: string; fullName: string; email: string; role: string; branchId: string }
@@ -47,6 +48,16 @@ export default function CheckInPage() {
 
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [visitId, setVisitId] = useState<string | null>(null);
+  const [createdSnapshot, setCreatedSnapshot] = useState<null | {
+    visitorName: string;
+    visitorCompany: string;
+    hostName: string;
+    branchName: string;
+    branchLocation: string;
+    purpose: string;
+    expectedEntry: string;
+    vehicleNumber: string;
+  }>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -99,6 +110,18 @@ export default function CheckInPage() {
 
       setQrToken(visit.qrCodeToken);
       setVisitId(visit.id);
+      const branch = branches.find((b) => b.id === form.branchId);
+      const host = hosts.find((h) => h.id === form.hostId);
+      setCreatedSnapshot({
+        visitorName: form.visitorName,
+        visitorCompany: form.visitorCompany,
+        hostName: host?.fullName ?? '—',
+        branchName: branch?.name ?? '—',
+        branchLocation: branch?.location ?? '',
+        purpose: form.purpose,
+        expectedEntry: form.expectedEntry || new Date().toISOString(),
+        vehicleNumber: form.vehicleNumber,
+      });
       setForm({
         ...form,
         visitorName: '',
@@ -315,8 +338,43 @@ export default function CheckInPage() {
                     <Copy className="w-4 h-4" />
                   </button>
                 </div>
+                {visitId && (
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = `${window.location.origin}/pass/${visitId}`;
+                        navigator.clipboard.writeText(url);
+                      }}
+                      className="flex items-center justify-center gap-2 px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-white text-sm font-medium"
+                      title="Copy public pass link to clipboard"
+                    >
+                      <Share2 className="w-4 h-4" /> Copy pass link
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!createdSnapshot || !qrToken) return;
+                        downloadBadgePDF({
+                          visitorName: createdSnapshot.visitorName,
+                          visitorCompany: createdSnapshot.visitorCompany || null,
+                          hostName: createdSnapshot.hostName,
+                          branchName: createdSnapshot.branchName,
+                          branchLocation: createdSnapshot.branchLocation,
+                          purpose: createdSnapshot.purpose,
+                          expectedEntry: createdSnapshot.expectedEntry,
+                          vehicleNumber: createdSnapshot.vehicleNumber || null,
+                          qrCodeToken: qrToken,
+                        });
+                      }}
+                      className="flex items-center justify-center gap-2 px-3 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
+                    >
+                      <Download className="w-4 h-4" /> Badge PDF
+                    </button>
+                  </div>
+                )}
                 <p className="text-xs text-zinc-400 mt-3">
-                  Scan with the kiosk camera or paste token into the mobile app.
+                  Pass link works on any phone (no login). Scan with the kiosk or paste token into the mobile app.
                   <br />
                   Visit ID: <span className="font-mono">{visitId}</span>
                 </p>

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaClient, VisitStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import { HeadcountGateway } from '../../gateways/headcount.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const prisma = new PrismaClient();
 
@@ -20,7 +21,10 @@ function parsePhotoBase64(input?: string | null): Buffer | undefined {
 
 @Injectable()
 export class VisitorsService {
-  constructor(private readonly headcount: HeadcountGateway) {}
+  constructor(
+    private readonly headcount: HeadcountGateway,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async createVisit(data: any) {
     const qrToken = crypto.randomBytes(16).toString('hex');
@@ -62,6 +66,51 @@ export class VisitorsService {
     });
   }
 
+  /** Public visitor pass — exposed without auth so the visitor can open the link. */
+  async getPublicPass(id: string) {
+    const visit = await prisma.visit.findUnique({
+      where: { id },
+      include: {
+        visitor: { select: { fullName: true, company: true, phone: true } },
+        host: { select: { fullName: true, email: true } },
+        branch: { select: { name: true, location: true } },
+      },
+    });
+    if (!visit) return null;
+    return {
+      visitId: visit.id,
+      qrCodeToken: visit.qrCodeToken,
+      status: visit.status,
+      purpose: visit.purpose,
+      expectedEntry: visit.expectedEntry,
+      actualEntry: visit.actualEntry,
+      actualExit: visit.actualExit,
+      vehicleNumber: visit.vehicleNumber,
+      visitor: visit.visitor,
+      host: visit.host,
+      branch: visit.branch,
+    };
+  }
+
+  /** List of vehicles seen — every visit with a vehicleNumber. */
+  async listVehicles(limit = 200) {
+    return prisma.visit.findMany({
+      where: { vehicleNumber: { not: null } },
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        vehicleNumber: true,
+        status: true,
+        expectedEntry: true,
+        actualEntry: true,
+        actualExit: true,
+        visitor: { select: { fullName: true, phone: true, company: true } },
+        branch: { select: { name: true } },
+      },
+    });
+  }
+
   async getVisit(id: string) {
     return prisma.visit.findUnique({
       where: { id },
@@ -73,10 +122,32 @@ export class VisitorsService {
   }
 
   async updateVisitStatus(id: string, status: string) {
-    return prisma.visit.update({
+    const updated = await prisma.visit.update({
       where: { id },
       data: { status: status as any },
+      include: {
+        visitor: { select: { fullName: true, email: true } },
+        host: { select: { fullName: true } },
+        branch: { select: { name: true } },
+      },
     });
+
+    // Fire-and-forget approval email — no-op if RESEND_API_KEY isn't set
+    if (status === 'APPROVED' && updated.visitor.email) {
+      const base = process.env.PUBLIC_WEB_URL || 'https://vms-web-theta.vercel.app';
+      this.notifications
+        .sendVisitorPassApproved({
+          to: updated.visitor.email,
+          visitorName: updated.visitor.fullName,
+          hostName: updated.host.fullName,
+          branchName: updated.branch.name,
+          expectedEntry: updated.expectedEntry,
+          passUrl: `${base}/pass/${updated.id}`,
+        })
+        .catch(() => {});
+    }
+
+    return updated;
   }
 
   async checkInVisitor(visitId: string) {
