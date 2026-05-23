@@ -43,3 +43,8 @@ packages/database/prisma/migrations/dev.db*
 
 # Vercel
 .vercel
+
+# Local scratch / IDE state
+_seed.js
+_check_db.js
+.claude/

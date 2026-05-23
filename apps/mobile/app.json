@@ -9,7 +9,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0f172a"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.vms.mobile"
@@ -18,7 +20,11 @@
       "package": "com.vms.mobile"
     },
     "extra": {
-      "apiUrl": "http://localhost:4000"
-    }
+      "apiUrl": "https://vms-api-gxep.onrender.com",
+      "eas": {
+        "projectId": "5c43255e-779b-4f30-a92f-51bb6a92df58"
+      }
+    },
+    "owner": "sam7399"
   }
 }
