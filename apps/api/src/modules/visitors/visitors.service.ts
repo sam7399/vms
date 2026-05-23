@@ -111,6 +111,38 @@ export class VisitorsService {
     };
   }
 
+  /**
+   * Per-day visit count for the last N days, scoped to user's org.
+   * Returns oldest -> newest. Each entry: { date: 'YYYY-MM-DD', count }.
+   */
+  async getDailyAnalytics(user: JwtUser, days = 7) {
+    const cap = Math.min(Math.max(days, 1), 90);
+    const since = new Date();
+    since.setUTCHours(0, 0, 0, 0);
+    since.setUTCDate(since.getUTCDate() - (cap - 1));
+
+    const visits = await prisma.visit.findMany({
+      where: { createdAt: { gte: since }, ...visitScope(user) },
+      select: { createdAt: true, status: true },
+    });
+
+    const buckets: Record<string, { total: number; approved: number; checkedIn: number }> = {};
+    for (let i = 0; i < cap; i++) {
+      const d = new Date(since);
+      d.setUTCDate(since.getUTCDate() + i);
+      buckets[d.toISOString().slice(0, 10)] = { total: 0, approved: 0, checkedIn: 0 };
+    }
+    for (const v of visits) {
+      const key = v.createdAt.toISOString().slice(0, 10);
+      const b = buckets[key];
+      if (!b) continue;
+      b.total += 1;
+      if (v.status === 'APPROVED' || v.status === 'CHECKED_IN' || v.status === 'CHECKED_OUT') b.approved += 1;
+      if (v.status === 'CHECKED_IN' || v.status === 'CHECKED_OUT') b.checkedIn += 1;
+    }
+    return Object.entries(buckets).map(([date, b]) => ({ date, ...b }));
+  }
+
   /** List of vehicles seen — every visit with a vehicleNumber. */
   async listVehicles(user: JwtUser, limit = 200) {
     return prisma.visit.findMany({

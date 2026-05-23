@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 
@@ -26,9 +27,21 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // Swagger / OpenAPI docs at /docs
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('VMS API')
+    .setDescription('Enterprise visitor & workforce management API')
+    .setVersion('1.0.0')
+    .addBearerAuth()
+    .build();
+  const swaggerDoc = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('docs', app, swaggerDoc, {
+    swaggerOptions: { persistAuthorization: true },
+  });
+
   const port = process.env.PORT || 4000;
   await app.listen(port);
-  console.log(`✓ API running on http://localhost:${port}`);
+  console.log(`✓ API running on http://localhost:${port} (docs: /docs)`);
 }
 
 bootstrap();

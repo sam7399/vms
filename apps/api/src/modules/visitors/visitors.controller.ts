@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { VisitorsService } from './visitors.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -31,6 +31,12 @@ export class VisitorsController {
   @Get('vehicles')
   listVehicles(@CurrentUser() user: JwtUser) {
     return this.visitorsService.listVehicles(user);
+  }
+
+  @Get('analytics')
+  analytics(@CurrentUser() user: JwtUser, @Query('days') days?: string) {
+    const d = days ? parseInt(days, 10) : 7;
+    return this.visitorsService.getDailyAnalytics(user, Number.isFinite(d) ? d : 7);
   }
 
   @Get('headcount')

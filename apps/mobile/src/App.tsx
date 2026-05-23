@@ -1,120 +1,138 @@
-import { useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { useEffect, useState } from "react";
+import { Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import Constants from "expo-constants";
+import { LoginScreen } from "./screens/LoginScreen";
+import { CheckInScreen } from "./screens/CheckInScreen";
+import { ApprovalsScreen } from "./screens/ApprovalsScreen";
+import { clearSession, getUser, SessionUser } from "./api";
 
-const API_URL =
-  (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ??
-  "http://localhost:4000";
+type AuthState =
+  | { kind: "loading" }
+  | { kind: "anonymous" }     // Login screen
+  | { kind: "gate" }          // Skipped login — check-in only
+  | { kind: "authed"; user: SessionUser };
+
+type Tab = "checkin" | "approvals";
 
 export default function App() {
-  const [token, setToken] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [auth, setAuth] = useState<AuthState>({ kind: "loading" });
+  const [tab, setTab] = useState<Tab>("checkin");
 
-  async function handleCheckIn() {
-    if (!token.trim()) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/gate/check-in`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ qrCodeToken: token.trim() }),
-      });
-      if (!res.ok) {
-        const body = await res.text();
-        Alert.alert("Check-in failed", body || `HTTP ${res.status}`);
-        return;
-      }
-      const data = await res.json();
-      Alert.alert("Welcome", `Hi ${data.visitorName ?? "Visitor"}!`);
-      setToken("");
-    } catch (err) {
-      Alert.alert(
-        "Network error",
-        err instanceof Error ? err.message : "Unknown error"
-      );
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    getUser()
+      .then((u) => setAuth(u ? { kind: "authed", user: u } : { kind: "anonymous" }))
+      .catch(() => setAuth({ kind: "anonymous" }));
+  }, []);
+
+  if (auth.kind === "loading") {
+    return (
+      <SafeAreaView style={styles.center}>
+        <StatusBar style="light" />
+        <Text style={{ color: "#64748b" }}>Loading…</Text>
+      </SafeAreaView>
+    );
   }
 
-  return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar style="light" />
-      <View style={styles.container}>
-        <Text style={styles.title}>VMS Mobile</Text>
-        <Text style={styles.subtitle}>Visitor & worker check-in</Text>
+  if (auth.kind === "anonymous") {
+    return (
+      <>
+        <StatusBar style="light" />
+        <LoginScreen
+          onLoggedIn={(user) => setAuth({ kind: "authed", user })}
+          onContinueAsGate={() => setAuth({ kind: "gate" })}
+        />
+      </>
+    );
+  }
 
-        <View style={styles.card}>
-          <Text style={styles.label}>QR token</Text>
-          <TextInput
-            style={styles.input}
-            value={token}
-            onChangeText={setToken}
-            placeholder="Paste or scan token"
-            placeholderTextColor="#64748b"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <Pressable
-            style={[styles.button, (!token.trim() || loading) && styles.buttonDisabled]}
-            onPress={handleCheckIn}
-            disabled={!token.trim() || loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Check in</Text>
-            )}
-          </Pressable>
+  if (auth.kind === "gate") {
+    return (
+      <>
+        <StatusBar style="light" />
+        <View style={styles.flex}>
+          <CheckInScreen />
+          <View style={styles.tabBar}>
+            <TabButton
+              label="Check-in"
+              active
+              onPress={() => {}}
+            />
+            <TabButton
+              label="Sign in"
+              onPress={() => setAuth({ kind: "anonymous" })}
+            />
+          </View>
         </View>
+      </>
+    );
+  }
 
-        <Text style={styles.footer}>API: {API_URL}</Text>
+  // authed
+  return (
+    <>
+      <StatusBar style="light" />
+      <View style={styles.flex}>
+        {tab === "checkin" ? (
+          <CheckInScreen />
+        ) : (
+          <ApprovalsScreen user={auth.user} />
+        )}
+        <View style={styles.tabBar}>
+          <TabButton
+            label="Check-in"
+            active={tab === "checkin"}
+            onPress={() => setTab("checkin")}
+          />
+          <TabButton
+            label="Approvals"
+            active={tab === "approvals"}
+            onPress={() => setTab("approvals")}
+          />
+          <TabButton
+            label="Sign out"
+            onPress={async () => {
+              await clearSession();
+              setAuth({ kind: "anonymous" });
+            }}
+          />
+        </View>
       </View>
-    </SafeAreaView>
+    </>
+  );
+}
+
+function TabButton({
+  label,
+  onPress,
+  active,
+}: {
+  label: string;
+  onPress: () => void;
+  active?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.tabBtn, active && styles.tabBtnActive]}
+    >
+      <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0f172a" },
-  container: { flex: 1, padding: 24, justifyContent: "center" },
-  title: { color: "#f8fafc", fontSize: 32, fontWeight: "700" },
-  subtitle: { color: "#94a3b8", fontSize: 14, marginBottom: 32 },
-  card: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+  flex: { flex: 1, backgroundColor: "#0f172a" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0f172a" },
+  tabBar: {
+    flexDirection: "row",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(15,23,42,0.95)",
+    paddingBottom: 18,
+    paddingTop: 8,
   },
-  label: { color: "#cbd5e1", fontSize: 12, marginBottom: 8, textTransform: "uppercase" },
-  input: {
-    backgroundColor: "#020617",
-    color: "#f8fafc",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-    marginBottom: 16,
-  },
-  button: {
-    backgroundColor: "#3b82f6",
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  buttonDisabled: { opacity: 0.5 },
-  buttonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
-  footer: { color: "#475569", fontSize: 11, marginTop: 24, textAlign: "center" },
+  tabBtn: { flex: 1, paddingVertical: 10, alignItems: "center" },
+  tabBtnActive: {},
+  tabText: { color: "#64748b", fontSize: 13, fontWeight: "500" },
+  tabTextActive: { color: "#60a5fa", fontWeight: "600" },
 });

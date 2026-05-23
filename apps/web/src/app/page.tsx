@@ -8,6 +8,7 @@ import { VisitorsTable } from "@/components/dashboard/VisitorsTable";
 import { ComplianceStatus } from "@/components/dashboard/ComplianceStatus";
 import { BranchFilter } from "@/components/dashboard/BranchFilter";
 import { ComplianceAlerts } from "@/components/dashboard/ComplianceAlerts";
+import { VisitsChart } from "@/components/dashboard/VisitsChart";
 import { DashboardHeader } from "@/components/dashboard-header";
 
 export default function DashboardPage() {
@@ -50,6 +51,10 @@ export default function DashboardPage() {
         </div>
 
         <ComplianceAlerts />
+
+        <div className="mt-8">
+          <VisitsChart />
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8 pb-12">
           <div className="lg:col-span-2">
