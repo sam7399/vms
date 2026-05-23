@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========== ENUMS ==========
+enum Role {
+  SUPER_ADMIN
+  ORG_ADMIN
+  HR_MANAGER
+  SECURITY_GUARD
+  RECEPTIONIST
+  CONTRACTOR_SUPERVISOR
+  EMPLOYEE
+}
+
+enum DocumentType {
+  AADHAAR
+  PAN
+  PASSPORT
+  DRIVING_LICENSE
+}
+
+enum VisitStatus {
+  PENDING
+  APPROVED
+  CHECKED_IN
+  CHECKED_OUT
+  REJECTED
+  BLACKLISTED
+}
+
+// ========== MODELS ==========
+
+model Organization {
+  id          String    @id @default(uuid())
+  name        String    @db.VarChar(255)
+  branches    Branch[]
+  contractors Contractor[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([name])
+}
+
+model Branch {
+  id             String    @id @default(uuid())
+  organizationId String
+  name           String    @db.VarChar(255)
+  location       String    @db.VarChar(500)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  users          User[]
+  visits         Visit[]
+  attendance     Attendance[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([organizationId])
+  @@index([name])
+}
+
+model User {
+  id           String    @id @default(uuid())
+  branchId     String
+  email        String    @unique @db.VarChar(255)
+  passwordHash String
+  fullName     String    @db.VarChar(255)
+  role         Role
+  phone        String?   @db.VarChar(20)
+  faceData     Bytes?    // Face embedding vector for facial recognition
+  isActive     Boolean   @default(true)
+  branch       Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  visitsHosted Visit[]   @relation("HostToVisit")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([branchId])
+  @@index([email])
+  @@index([role])
+}
+
+model Visitor {
+  id             String    @id @default(uuid())
+  fullName       String    @db.VarChar(255)
+  phone          String    @unique @db.VarChar(20)
+  email          String?   @db.VarChar(255)
+  company        String?   @db.VarChar(255)
+  documentType   DocumentType
+  documentNumber String    @db.VarChar(100)
+  faceData       Bytes?
+  isBlacklisted  Boolean   @default(false)
+  visits         Visit[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([phone])
+  @@index([isBlacklisted])
+}
+
+model Visit {
+  id            String      @id @default(uuid())
+  visitorId     String
+  branchId      String
+  hostId        String
+  purpose       String      @db.VarChar(500)
+  status        VisitStatus @default(PENDING)
+  expectedEntry DateTime
+  actualEntry   DateTime?
+  actualExit    DateTime?
+  vehicleNumber String?     @db.VarChar(50)
+  qrCodeToken   String      @unique @db.VarChar(500)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  visitor       Visitor     @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  branch        Branch      @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  host          User        @relation("HostToVisit", fields: [hostId], references: [id], onDelete: Restrict)
+
+  @@index([visitorId])
+  @@index([branchId])
+  @@index([hostId])
+  @@index([status])
+  @@index([expectedEntry])
+}
+
+model Contractor {
+  id             String    @id @default(uuid())
+  organizationId String
+  companyName    String    @db.VarChar(255)
+  gstNumber      String    @unique @db.VarChar(50)
+  complianceScore Float    @default(100.0)
+  workers        Worker[]
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([organizationId])
+  @@index([gstNumber])
+}
+
+model Worker {
+  id             String    @id @default(uuid())
+  contractorId   String
+  fullName       String    @db.VarChar(255)
+  phone          String    @db.VarChar(20)
+  documentType   DocumentType
+  documentNumber String    @db.VarChar(100)
+  skillCategory  String    @db.VarChar(100)
+  faceData       Bytes?
+  medicalExpiry  DateTime
+  policeVerified Boolean   @default(false)
+  isActive       Boolean   @default(true)
+  contractor     Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+  attendance     Attendance[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([contractorId])
+  @@index([isActive])
+}
+
+model Attendance {
+  id         String    @id @default(uuid())
+  workerId   String
+  branchId   String
+  checkIn    DateTime  @default(now())
+  checkOut   DateTime?
+  gateId     String    @db.VarChar(100)
+  worker     Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  branch     Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@index([workerId])
+  @@index([branchId])
+  @@index([checkIn])
+}

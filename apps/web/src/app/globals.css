@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 220deg 13% 13%;
+  --foreground: 213deg 31% 91%;
+}
+
+body {
+  @apply bg-background text-foreground;
+}
