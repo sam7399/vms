@@ -12,11 +12,13 @@ services:
     runtime: node
     plan: free
     rootDir: .
+    # NODE_ENV=production makes npm skip devDeps by default — force them in
+    # for the build step so nest/typescript/prisma CLI are available.
     buildCommand: >-
-      npm install &&
-      cd packages/database && npx prisma generate &&
-      cd ../../apps/api && npm run build
-    startCommand: cd apps/api && npm start
+      npm install --include=dev &&
+      npx prisma generate --schema=packages/database/prisma/schema.prisma &&
+      npm --workspace=@vms/api run build
+    startCommand: npm --workspace=@vms/api start
     healthCheckPath: /
     envVars:
       - key: NODE_ENV

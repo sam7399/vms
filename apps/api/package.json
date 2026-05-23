@@ -4,8 +4,8 @@
   "description": "NestJS REST & WebSocket API",
   "private": true,
   "scripts": {
-    "dev": "npx nest start --watch",
-    "build": "npx nest build",
+    "dev": "nest start --watch",
+    "build": "nest build",
     "start": "node dist/main",
     "lint": "eslint src/**/*.ts"
   },
