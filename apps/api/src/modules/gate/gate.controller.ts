@@ -7,8 +7,14 @@ export class GateController {
   constructor(private gateService: GateService) {}
 
   @Post('face-entry')
-  async processFaceEntry(@Body() body: { gateId: string; capturedEmbedding: Buffer }) {
-    return this.gateService.processFaceEntry(body.gateId, body.capturedEmbedding);
+  async processFaceEntry(
+    @Body() body: { gateId: string; branchId: string; capturedEmbedding: Buffer },
+  ) {
+    return this.gateService.processFaceEntry(
+      body.gateId,
+      body.branchId,
+      body.capturedEmbedding,
+    );
   }
 
   @Get('log/:gateId')

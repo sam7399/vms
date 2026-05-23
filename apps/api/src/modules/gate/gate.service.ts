@@ -11,7 +11,7 @@ export class GateService {
     return Math.random() * 0.3 + 0.7; // Mock: 70-100% similarity
   }
 
-  async processFaceEntry(gateId: string, capturedEmbedding: Buffer) {
+  async processFaceEntry(gateId: string, branchId: string, capturedEmbedding: Buffer) {
     const CONFIDENCE_THRESHOLD = 0.85;
 
     // Get active workers
@@ -55,6 +55,7 @@ export class GateService {
     const attendance = await prisma.attendance.create({
       data: {
         workerId: matchedWorker.id,
+        branchId,
         gateId,
         checkIn: new Date(),
       },

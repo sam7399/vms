@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, VisitStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 
 const prisma = new PrismaClient();
@@ -18,7 +18,7 @@ export class VisitorsService {
         expectedEntry: new Date(data.expectedEntry),
         vehicleNumber: data.vehicleNumber,
         qrCodeToken: qrToken,
-        status: 'PENDING',
+        status: VisitStatus.PENDING,
       },
     });
   }
@@ -55,7 +55,7 @@ export class VisitorsService {
     return prisma.visit.update({
       where: { id: visitId },
       data: {
-        status: 'CHECKED_IN',
+        status: VisitStatus.CHECKED_IN,
         actualEntry: new Date(),
       },
     });
@@ -65,7 +65,7 @@ export class VisitorsService {
     return prisma.visit.update({
       where: { id: visitId },
       data: {
-        status: 'CHECKED_OUT',
+        status: VisitStatus.CHECKED_OUT,
         actualExit: new Date(),
       },
     });
@@ -91,7 +91,9 @@ export class VisitorsService {
   }
 
   async getLiveHeadcount(branchId?: string) {
-    const where = branchId ? { branchId, status: 'CHECKED_IN' } : { status: 'CHECKED_IN' };
+    const where = branchId
+      ? { branchId, status: VisitStatus.CHECKED_IN }
+      : { status: VisitStatus.CHECKED_IN };
 
     const visits = await prisma.visit.findMany({
       where,

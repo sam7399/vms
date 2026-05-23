@@ -1,6 +1,6 @@
 import { WebSocketGateway, WebSocketServer, SubscribeMessage, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, VisitStatus } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -37,7 +37,7 @@ export class HeadcountGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   private async calculateHeadcount() {
     const visits = await prisma.visit.findMany({
-      where: { status: 'CHECKED_IN' },
+      where: { status: VisitStatus.CHECKED_IN },
       include: { visitor: true },
     });
 
