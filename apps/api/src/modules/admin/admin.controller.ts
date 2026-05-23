@@ -4,71 +4,77 @@ import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { JwtUser } from '../../common/tenant';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AdminController {
   constructor(private readonly admin: AdminService) {}
 
-  // --- Reads: any authenticated user -----------------------------
+  // --- Reads: any authenticated user, scoped to their org --------
   @Get('branches')
-  branches() {
-    return this.admin.listBranches();
+  branches(@CurrentUser() user: JwtUser) {
+    return this.admin.listBranches(user);
   }
 
   @Get('hosts')
-  hosts() {
-    return this.admin.listHosts();
+  hosts(@CurrentUser() user: JwtUser) {
+    return this.admin.listHosts(user);
   }
 
   @Get('visitors')
-  visitors() {
-    return this.admin.listVisitors();
+  visitors(@CurrentUser() user: JwtUser) {
+    return this.admin.listVisitors(user);
   }
 
   @Get('contractors')
-  contractors() {
-    return this.admin.listContractors();
+  contractors(@CurrentUser() user: JwtUser) {
+    return this.admin.listContractors(user);
   }
 
   @Get('workers')
-  workers(@Query('contractorId') contractorId?: string) {
-    return this.admin.listWorkers(contractorId);
+  workers(@CurrentUser() user: JwtUser, @Query('contractorId') contractorId?: string) {
+    return this.admin.listWorkers(user, contractorId);
   }
 
   @Get('attendance')
-  attendance() {
-    return this.admin.listAttendance();
+  attendance(@CurrentUser() user: JwtUser) {
+    return this.admin.listAttendance(user);
   }
 
   @Get('audit')
   @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN)
-  audit() {
-    return this.admin.listAuditLogs();
+  audit(@CurrentUser() user: JwtUser) {
+    return this.admin.listAuditLogs(user);
   }
 
-  // --- Writes: admin / HR only -----------------------------------
+  // --- Writes: scoped + role-checked -----------------------------
   @Post('contractors')
   @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER)
-  createContractor(@Body() body: any) {
-    return this.admin.createContractor(body);
+  createContractor(@CurrentUser() user: JwtUser, @Body() body: any) {
+    return this.admin.createContractor(user, body);
   }
 
   @Post('workers')
   @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER, Role.CONTRACTOR_SUPERVISOR)
-  createWorker(@Body() body: any) {
-    return this.admin.createWorker(body);
+  createWorker(@CurrentUser() user: JwtUser, @Body() body: any) {
+    return this.admin.createWorker(user, body);
   }
 
   @Post('hosts')
   @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN)
-  createHost(@Body() body: any) {
-    return this.admin.createHost(body);
+  createHost(@CurrentUser() user: JwtUser, @Body() body: any) {
+    return this.admin.createHost(user, body);
   }
 
   @Put('visitors/:id/blacklist')
   @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER, Role.SECURITY_GUARD)
-  setBlacklist(@Param('id') id: string, @Body() body: { blacklist: boolean }) {
-    return this.admin.setVisitorBlacklist(id, !!body?.blacklist);
+  setBlacklist(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body: { blacklist: boolean },
+  ) {
+    return this.admin.setVisitorBlacklist(user, id, !!body?.blacklist);
   }
 }

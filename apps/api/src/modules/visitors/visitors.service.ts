@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaClient, VisitStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import { HeadcountGateway } from '../../gateways/headcount.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
+import { JwtUser, isSuperAdmin, visitScope } from '../../common/tenant';
 
 const prisma = new PrismaClient();
 
@@ -26,7 +27,23 @@ export class VisitorsService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  async createVisit(data: any) {
+  async createVisit(user: JwtUser, data: any) {
+    if (!data.visitorId || !data.branchId || !data.hostId) {
+      throw new BadRequestException('visitorId, branchId, hostId required');
+    }
+
+    // Authorize: branch must be in user's org (unless super admin)
+    if (!isSuperAdmin(user)) {
+      const branch = await prisma.branch.findUnique({
+        where: { id: data.branchId },
+        select: { organizationId: true },
+      });
+      if (!branch) throw new BadRequestException('Branch not found');
+      if (branch.organizationId !== (user as any).orgId) {
+        throw new ForbiddenException('Branch belongs to another organization');
+      }
+    }
+
     const qrToken = crypto.randomBytes(16).toString('hex');
 
     return prisma.visit.create({
@@ -43,9 +60,11 @@ export class VisitorsService {
     });
   }
 
-  async getAllVisits(branchId?: string) {
+  async getAllVisits(user: JwtUser, branchId?: string) {
+    const where: any = { ...visitScope(user) };
+    if (branchId) where.branchId = branchId;
     return prisma.visit.findMany({
-      where: branchId ? { branchId } : {},
+      where,
       include: {
         visitor: true,
         host: { select: { id: true, fullName: true, email: true } },
@@ -54,9 +73,9 @@ export class VisitorsService {
     });
   }
 
-  async getPendingVisits() {
+  async getPendingVisits(user: JwtUser) {
     return prisma.visit.findMany({
-      where: { status: VisitStatus.PENDING },
+      where: { status: VisitStatus.PENDING, ...visitScope(user) },
       include: {
         visitor: true,
         host: { select: { id: true, fullName: true, email: true } },
@@ -93,9 +112,9 @@ export class VisitorsService {
   }
 
   /** List of vehicles seen — every visit with a vehicleNumber. */
-  async listVehicles(limit = 200) {
+  async listVehicles(user: JwtUser, limit = 200) {
     return prisma.visit.findMany({
-      where: { vehicleNumber: { not: null } },
+      where: { vehicleNumber: { not: null }, ...visitScope(user) },
       take: limit,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -111,9 +130,9 @@ export class VisitorsService {
     });
   }
 
-  async getVisit(id: string) {
-    return prisma.visit.findUnique({
-      where: { id },
+  async getVisit(user: JwtUser, id: string) {
+    return prisma.visit.findFirst({
+      where: { id, ...visitScope(user) },
       include: {
         visitor: true,
         host: { select: { id: true, fullName: true, email: true } },
@@ -121,7 +140,20 @@ export class VisitorsService {
     });
   }
 
-  async updateVisitStatus(id: string, status: string) {
+  private async ensureVisitInScope(user: JwtUser, id: string) {
+    if (isSuperAdmin(user)) return;
+    const found = await prisma.visit.findFirst({
+      where: { id, ...visitScope(user) },
+      select: { id: true },
+    });
+    if (!found) {
+      // Hide existence: 404 not 403
+      throw new (await import('@nestjs/common')).NotFoundException('Visit not found');
+    }
+  }
+
+  async updateVisitStatus(user: JwtUser, id: string, status: string) {
+    await this.ensureVisitInScope(user, id);
     const updated = await prisma.visit.update({
       where: { id },
       data: { status: status as any },
@@ -160,7 +192,8 @@ export class VisitorsService {
     return updated;
   }
 
-  async checkInVisitor(visitId: string) {
+  async checkInVisitor(user: JwtUser, visitId: string) {
+    await this.ensureVisitInScope(user, visitId);
     const v = await prisma.visit.update({
       where: { id: visitId },
       data: { status: VisitStatus.CHECKED_IN, actualEntry: new Date() },
@@ -169,7 +202,8 @@ export class VisitorsService {
     return v;
   }
 
-  async checkOutVisitor(visitId: string) {
+  async checkOutVisitor(user: JwtUser, visitId: string) {
+    await this.ensureVisitInScope(user, visitId);
     const v = await prisma.visit.update({
       where: { id: visitId },
       data: { status: VisitStatus.CHECKED_OUT, actualExit: new Date() },
@@ -192,19 +226,27 @@ export class VisitorsService {
     });
   }
 
-  async getVisitors() {
+  async getVisitors(user: JwtUser) {
+    const where: any = isSuperAdmin(user)
+      ? {}
+      : { visits: { some: { branch: { organizationId: (user as any).orgId } } } };
     return prisma.visitor.findMany({
+      where,
       orderBy: { id: 'desc' },
     });
   }
 
-  async getLiveHeadcount(branchId?: string) {
-    const visitWhere = branchId
-      ? { branchId, status: VisitStatus.CHECKED_IN, actualExit: null }
-      : { status: VisitStatus.CHECKED_IN, actualExit: null };
-    const attendanceWhere = branchId
-      ? { branchId, checkOut: null }
-      : { checkOut: null };
+  async getLiveHeadcount(user: JwtUser, branchId?: string) {
+    const orgFilter = visitScope(user);
+    const visitWhere: any = { status: VisitStatus.CHECKED_IN, actualExit: null, ...orgFilter };
+    const attendanceWhere: any = { checkOut: null };
+    if (!isSuperAdmin(user)) {
+      attendanceWhere.branch = { organizationId: (user as any).orgId };
+    }
+    if (branchId) {
+      visitWhere.branchId = branchId;
+      attendanceWhere.branchId = branchId;
+    }
 
     const [activeVisits, workers] = await Promise.all([
       prisma.visit.findMany({

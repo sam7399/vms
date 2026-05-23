@@ -9,6 +9,8 @@ export interface JwtPayload {
   sub: string;
   email: string;
   role: string;
+  orgId: string | null;
+  branchId: string;
 }
 
 @Injectable()
@@ -25,10 +27,18 @@ export class AuthService {
   }
 
   async login(user: any) {
+    // Resolve org via branch
+    const branch = await prisma.branch.findUnique({
+      where: { id: user.branchId },
+      select: { organizationId: true },
+    });
+
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
+      orgId: branch?.organizationId ?? null,
+      branchId: user.branchId,
     };
 
     return {
@@ -39,6 +49,7 @@ export class AuthService {
         fullName: user.fullName,
         role: user.role,
         branchId: user.branchId,
+        orgId: branch?.organizationId ?? null,
       },
     };
   }

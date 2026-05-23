@@ -46,5 +46,6 @@ packages/database/prisma/migrations/dev.db*
 
 # Local scratch / IDE state
 _seed.js
+_seed_org2.js
 _check_db.js
 .claude/

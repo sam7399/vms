@@ -1,22 +1,24 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import {
+  JwtUser,
+  contractorScope,
+  isSuperAdmin,
+  workerScope,
+} from '../../common/tenant';
 
 const prisma = new PrismaClient();
 
 @Injectable()
 export class ComplianceService {
-  async getWorkerCompliance(workerId: string) {
-    const worker = await prisma.worker.findUnique({
-      where: { id: workerId },
+  async getWorkerCompliance(user: JwtUser, workerId: string) {
+    const worker = await prisma.worker.findFirst({
+      where: { id: workerId, ...workerScope(user) },
     });
-
-    if (!worker) {
-      return null;
-    }
+    if (!worker) return null;
 
     const now = new Date();
     const medicalExpired = worker.medicalExpiry < now;
-
     return {
       workerId: worker.id,
       fullName: worker.fullName,
@@ -25,28 +27,22 @@ export class ComplianceService {
       policeVerified: worker.policeVerified,
       documentType: worker.documentType,
       documentNumber: worker.documentNumber,
-      overallCompliance: worker.policeVerified && !medicalExpired ? 'COMPLIANT' : 'NON_COMPLIANT',
+      overallCompliance:
+        worker.policeVerified && !medicalExpired ? 'COMPLIANT' : 'NON_COMPLIANT',
     };
   }
 
-  async getContractorCompliance(contractorId: string) {
-    const contractor = await prisma.contractor.findUnique({
-      where: { id: contractorId },
+  async getContractorCompliance(user: JwtUser, contractorId: string) {
+    const contractor = await prisma.contractor.findFirst({
+      where: { id: contractorId, ...contractorScope(user) },
     });
+    if (!contractor) return null;
 
-    if (!contractor) {
-      return null;
-    }
-
-    const workers = await prisma.worker.findMany({
-      where: { contractorId },
-    });
-
+    const workers = await prisma.worker.findMany({ where: { contractorId } });
     const now = new Date();
     const compliantWorkers = workers.filter(
-      (w: any) => w.policeVerified && w.medicalExpiry > now
+      (w: any) => w.policeVerified && w.medicalExpiry > now,
     ).length;
-
     const complianceScore = workers.length > 0 ? (compliantWorkers / workers.length) * 100 : 0;
 
     return {
@@ -60,19 +56,18 @@ export class ComplianceService {
     };
   }
 
-  async getAllComplianceStatus() {
+  async getAllComplianceStatus(user: JwtUser) {
     const contractors = await prisma.contractor.findMany({
+      where: contractorScope(user),
       include: { workers: true },
     });
-
     const now = new Date();
 
     return contractors.map((c: any) => {
       const compliantWorkers = c.workers.filter(
-        (w: any) => w.policeVerified && w.medicalExpiry > now
+        (w: any) => w.policeVerified && w.medicalExpiry > now,
       ).length;
       const score = c.workers.length > 0 ? (compliantWorkers / c.workers.length) * 100 : 0;
-
       return {
         contractorId: c.id,
         companyName: c.companyName,
@@ -84,7 +79,14 @@ export class ComplianceService {
     });
   }
 
-  async updateWorkerCompliance(workerId: string, data: any) {
+  async updateWorkerCompliance(user: JwtUser, workerId: string, data: any) {
+    if (!isSuperAdmin(user)) {
+      const w = await prisma.worker.findFirst({
+        where: { id: workerId, ...workerScope(user) },
+        select: { id: true },
+      });
+      if (!w) throw new NotFoundException('Worker not found');
+    }
     return prisma.worker.update({
       where: { id: workerId },
       data: {
@@ -94,16 +96,12 @@ export class ComplianceService {
     });
   }
 
-  /** Workers whose medical cert is already expired or expires within `daysAhead`. */
-  async getExpiringSoon(daysAhead = 30) {
+  async getExpiringSoon(user: JwtUser, daysAhead = 30) {
     const now = new Date();
     const threshold = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
 
     const workers = await prisma.worker.findMany({
-      where: {
-        isActive: true,
-        medicalExpiry: { lte: threshold },
-      },
+      where: { isActive: true, medicalExpiry: { lte: threshold }, ...workerScope(user) },
       include: { contractor: { select: { companyName: true } } },
       orderBy: { medicalExpiry: 'asc' },
     });

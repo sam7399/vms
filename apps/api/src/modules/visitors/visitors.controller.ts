@@ -4,6 +4,8 @@ import { VisitorsService } from './visitors.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { JwtUser } from '../../common/tenant';
 
 @Controller('visitors')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -12,43 +14,43 @@ export class VisitorsController {
 
   // --- Reads --------------------------------------------------
   @Get()
-  getVisitors() {
-    return this.visitorsService.getVisitors();
+  getVisitors(@CurrentUser() user: JwtUser) {
+    return this.visitorsService.getVisitors(user);
   }
 
   @Get('visits')
-  getAllVisits() {
-    return this.visitorsService.getAllVisits();
+  getAllVisits(@CurrentUser() user: JwtUser) {
+    return this.visitorsService.getAllVisits(user);
   }
 
   @Get('pending')
-  getPendingVisits() {
-    return this.visitorsService.getPendingVisits();
+  getPendingVisits(@CurrentUser() user: JwtUser) {
+    return this.visitorsService.getPendingVisits(user);
   }
 
   @Get('vehicles')
-  listVehicles() {
-    return this.visitorsService.listVehicles();
+  listVehicles(@CurrentUser() user: JwtUser) {
+    return this.visitorsService.listVehicles(user);
   }
 
   @Get('headcount')
-  getHeadcountDefault() {
-    return this.visitorsService.getLiveHeadcount();
+  getHeadcountDefault(@CurrentUser() user: JwtUser) {
+    return this.visitorsService.getLiveHeadcount(user);
   }
 
   @Get('headcount/:branchId')
-  getHeadcount(@Param('branchId') branchId: string) {
-    return this.visitorsService.getLiveHeadcount(branchId);
+  getHeadcount(@CurrentUser() user: JwtUser, @Param('branchId') branchId: string) {
+    return this.visitorsService.getLiveHeadcount(user, branchId);
   }
 
   @Get('visit/list/:branchId')
-  getVisitsByBranch(@Param('branchId') branchId: string) {
-    return this.visitorsService.getAllVisits(branchId);
+  getVisitsByBranch(@CurrentUser() user: JwtUser, @Param('branchId') branchId: string) {
+    return this.visitorsService.getAllVisits(user, branchId);
   }
 
   @Get('visit/:id')
-  getVisit(@Param('id') id: string) {
-    return this.visitorsService.getVisit(id);
+  getVisit(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.visitorsService.getVisit(user, id);
   }
 
   // --- Writes -------------------------------------------------
@@ -60,25 +62,29 @@ export class VisitorsController {
 
   @Post('visit')
   @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER, Role.RECEPTIONIST, Role.EMPLOYEE)
-  createVisit(@Body() body: any) {
-    return this.visitorsService.createVisit(body);
+  createVisit(@CurrentUser() user: JwtUser, @Body() body: any) {
+    return this.visitorsService.createVisit(user, body);
   }
 
   @Put('visit/:id/checkin')
   @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER, Role.SECURITY_GUARD, Role.RECEPTIONIST)
-  checkIn(@Param('id') id: string) {
-    return this.visitorsService.checkInVisitor(id);
+  checkIn(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.visitorsService.checkInVisitor(user, id);
   }
 
   @Put('visit/:id/checkout')
   @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER, Role.SECURITY_GUARD, Role.RECEPTIONIST)
-  checkOut(@Param('id') id: string) {
-    return this.visitorsService.checkOutVisitor(id);
+  checkOut(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.visitorsService.checkOutVisitor(user, id);
   }
 
   @Put('visit/:id/status')
   @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER)
-  updateStatus(@Param('id') id: string, @Body() body: { status: string }) {
-    return this.visitorsService.updateVisitStatus(id, body.status);
+  updateStatus(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body: { status: string },
+  ) {
+    return this.visitorsService.updateVisitStatus(user, id, body.status);
   }
 }
