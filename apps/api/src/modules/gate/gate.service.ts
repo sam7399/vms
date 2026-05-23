@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { PrismaClient, VisitStatus } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -67,6 +67,48 @@ export class GateService {
       workerId: matchedWorker.id,
       workerName: matchedWorker.fullName,
       attendanceId: attendance.id,
+    };
+  }
+
+  async checkInByQrToken(qrCodeToken: string) {
+    if (!qrCodeToken?.trim()) {
+      throw new BadRequestException('qrCodeToken is required');
+    }
+
+    const visit = await prisma.visit.findUnique({
+      where: { qrCodeToken },
+      include: { visitor: true },
+    });
+
+    if (!visit) throw new NotFoundException('Invalid QR token');
+
+    if (visit.status === VisitStatus.CHECKED_IN) {
+      return {
+        success: true,
+        already: true,
+        visitorName: visit.visitor.fullName,
+        visitId: visit.id,
+        checkedInAt: visit.actualEntry,
+      };
+    }
+
+    if (visit.status === VisitStatus.REJECTED || visit.status === VisitStatus.BLACKLISTED) {
+      throw new BadRequestException(`Visit is ${visit.status}`);
+    }
+
+    const updated = await prisma.visit.update({
+      where: { id: visit.id },
+      data: {
+        status: VisitStatus.CHECKED_IN,
+        actualEntry: new Date(),
+      },
+    });
+
+    return {
+      success: true,
+      visitorName: visit.visitor.fullName,
+      visitId: updated.id,
+      checkedInAt: updated.actualEntry,
     };
   }
 

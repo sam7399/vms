@@ -17,6 +17,11 @@ export class GateController {
     );
   }
 
+  @Post('check-in')
+  async checkIn(@Body() body: { qrCodeToken: string }) {
+    return this.gateService.checkInByQrToken(body.qrCodeToken);
+  }
+
   @Get('log/:gateId')
   @UseGuards(JwtAuthGuard)
   async getGateLog(@Param('gateId') gateId: string) {
