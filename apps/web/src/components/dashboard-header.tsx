@@ -93,6 +93,12 @@ export function DashboardHeader() {
           >
             Audit
           </Link>
+          <Link
+            href="/settings"
+            className="px-4 py-2 rounded-t-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/10 transition-colors ml-auto"
+          >
+            Settings
+          </Link>
         </nav>
       </div>
     </header>

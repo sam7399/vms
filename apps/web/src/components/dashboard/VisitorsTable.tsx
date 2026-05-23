@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Clock, CheckCircle, XCircle, Hourglass, AlertCircle } from "lucide-react";
-import { apiGet } from "@/lib/api";
+import { Clock, CheckCircle, XCircle, Hourglass, AlertCircle, LogIn, LogOut } from "lucide-react";
+import { apiGet, apiPut } from "@/lib/api";
 
 type VisitStatus =
   | "PENDING"
@@ -69,28 +69,39 @@ function StatusIcon({ status }: { status: VisitStatus }) {
 export function VisitorsTable({ branchId = "" }: { branchId?: string }) {
   const [visits, setVisits] = useState<ApiVisit[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function load() {
+    try {
+      const path = branchId
+        ? `/visitors/visit/list/${encodeURIComponent(branchId)}`
+        : "/visitors/visits";
+      const data = await apiGet<ApiVisit[]>(path);
+      setVisits(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load visits");
+    }
+  }
 
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const path = branchId
-          ? `/visitors/visit/list/${encodeURIComponent(branchId)}`
-          : "/visitors/visits";
-        const data = await apiGet<ApiVisit[]>(path);
-        if (!cancelled) setVisits(data);
-      } catch (e) {
-        if (!cancelled)
-          setError(e instanceof Error ? e.message : "Failed to load visits");
-      }
-    }
     load();
     const interval = setInterval(load, 15_000); // refresh every 15s
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branchId]);
+
+  async function checkInOut(id: string, action: "checkin" | "checkout") {
+    setBusyId(id);
+    setError(null);
+    try {
+      await apiPut(`/visitors/visit/${id}/${action}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `${action} failed`);
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden">
@@ -144,8 +155,28 @@ export function VisitorsTable({ branchId = "" }: { branchId?: string }) {
                     ` • Arrived: ${formatDate(visit.actualEntry)}`}
                 </p>
               </div>
-              <div className="ml-4 shrink-0">
+              <div className="ml-4 shrink-0 flex items-center gap-2">
                 <StatusIcon status={visit.status} />
+                {visit.status === "APPROVED" && (
+                  <button
+                    onClick={() => checkInOut(visit.id, "checkin")}
+                    disabled={busyId === visit.id}
+                    title="Mark checked in"
+                    className="p-1.5 rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 disabled:opacity-50"
+                  >
+                    <LogIn className="w-4 h-4" />
+                  </button>
+                )}
+                {visit.status === "CHECKED_IN" && (
+                  <button
+                    onClick={() => checkInOut(visit.id, "checkout")}
+                    disabled={busyId === visit.id}
+                    title="Mark checked out"
+                    className="p-1.5 rounded bg-zinc-500/10 hover:bg-zinc-500/20 text-zinc-300 disabled:opacity-50"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>
