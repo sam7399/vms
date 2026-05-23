@@ -19,7 +19,8 @@
     "framer-motion": "^10.16.16",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
-    "lucide-react": "^0.376.0"
+    "lucide-react": "^0.376.0",
+    "qrcode.react": "^4.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.10.6",

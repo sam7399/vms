@@ -70,10 +70,22 @@ export function DashboardHeader() {
             Workers
           </Link>
           <Link
+            href="/approvals"
+            className="px-4 py-2 rounded-t-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            Approvals
+          </Link>
+          <Link
             href="/reports"
             className="px-4 py-2 rounded-t-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
           >
             Reports
+          </Link>
+          <Link
+            href="/audit"
+            className="px-4 py-2 rounded-t-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            Audit
           </Link>
         </nav>
       </div>

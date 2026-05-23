@@ -93,4 +93,37 @@ export class ComplianceService {
       },
     });
   }
+
+  /** Workers whose medical cert is already expired or expires within `daysAhead`. */
+  async getExpiringSoon(daysAhead = 30) {
+    const now = new Date();
+    const threshold = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
+
+    const workers = await prisma.worker.findMany({
+      where: {
+        isActive: true,
+        medicalExpiry: { lte: threshold },
+      },
+      include: { contractor: { select: { companyName: true } } },
+      orderBy: { medicalExpiry: 'asc' },
+    });
+
+    return workers.map((w: any) => ({
+      workerId: w.id,
+      fullName: w.fullName,
+      contractor: w.contractor.companyName,
+      skillCategory: w.skillCategory,
+      medicalExpiry: w.medicalExpiry,
+      daysUntilExpiry: Math.floor(
+        (new Date(w.medicalExpiry).getTime() - now.getTime()) / (24 * 60 * 60 * 1000),
+      ),
+      policeVerified: w.policeVerified,
+      severity:
+        new Date(w.medicalExpiry) < now
+          ? 'EXPIRED'
+          : new Date(w.medicalExpiry).getTime() - now.getTime() < 7 * 24 * 60 * 60 * 1000
+          ? 'CRITICAL'
+          : 'WARNING',
+    }));
+  }
 }

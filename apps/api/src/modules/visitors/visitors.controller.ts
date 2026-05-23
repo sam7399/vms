@@ -21,6 +21,11 @@ export class VisitorsController {
     return this.visitorsService.getAllVisits();
   }
 
+  @Get('pending')
+  getPendingVisits() {
+    return this.visitorsService.getPendingVisits();
+  }
+
   @Get('headcount')
   getHeadcountDefault() {
     return this.visitorsService.getLiveHeadcount();

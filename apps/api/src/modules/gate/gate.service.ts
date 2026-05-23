@@ -106,6 +106,12 @@ export class GateService {
       throw new BadRequestException(`Visit is ${visit.status}`);
     }
 
+    if (visit.status === VisitStatus.PENDING) {
+      throw new BadRequestException(
+        'Visit is still awaiting host approval — ask your host to approve first',
+      );
+    }
+
     const updated = await prisma.visit.update({
       where: { id: visit.id },
       data: {

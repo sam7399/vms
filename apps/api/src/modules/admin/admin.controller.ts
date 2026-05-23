@@ -41,6 +41,12 @@ export class AdminController {
     return this.admin.listAttendance();
   }
 
+  @Get('audit')
+  @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN)
+  audit() {
+    return this.admin.listAuditLogs();
+  }
+
   // --- Writes: admin / HR only -----------------------------------
   @Post('contractors')
   @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER)

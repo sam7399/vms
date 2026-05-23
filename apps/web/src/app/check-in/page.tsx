@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
-import { QrCode, CheckCircle, AlertCircle, Copy } from 'lucide-react';
+import { CheckCircle, AlertCircle, Copy, Camera, X } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { apiGet, apiPost } from '@/lib/api';
+import { WebcamCapture } from '@/components/webcam-capture';
 
 interface Branch { id: string; name: string; location: string }
 interface Host { id: string; fullName: string; email: string; role: string; branchId: string }
@@ -41,6 +43,7 @@ export default function CheckInPage() {
     vehicleNumber: '',
     expectedEntry: '',
   });
+  const [photo, setPhoto] = useState<string>('');
 
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [visitId, setVisitId] = useState<string | null>(null);
@@ -82,6 +85,7 @@ export default function CheckInPage() {
         company: form.visitorCompany || undefined,
         documentType: form.documentType,
         documentNumber: form.documentNumber,
+        photoBase64: photo || undefined,
       });
 
       const visit = await apiPost<VisitResponse>('/visitors/visit', {
@@ -283,37 +287,45 @@ export default function CheckInPage() {
             </button>
           </form>
 
-          <div>
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-sm font-medium text-zinc-300 mb-3 flex items-center gap-2">
+                <Camera className="w-4 h-4 text-blue-400" /> Visitor photo (optional)
+              </h3>
+              <WebcamCapture onCapture={setPhoto} />
+            </div>
+
             {qrToken ? (
-              <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-8 backdrop-blur-xl">
+              <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-6 backdrop-blur-xl">
                 <div className="flex items-center gap-3 mb-4">
-                  <CheckCircle className="w-8 h-8 text-green-400" />
-                  <h3 className="text-2xl font-bold text-white">Visit created</h3>
+                  <CheckCircle className="w-7 h-7 text-green-400" />
+                  <h3 className="text-xl font-bold text-white">Visit created</h3>
                 </div>
-                <div className="bg-white aspect-square rounded-lg flex items-center justify-center mb-4">
-                  <QrCode className="w-40 h-40 text-slate-900" />
+                <div className="bg-white rounded-lg p-4 flex items-center justify-center mb-4">
+                  <QRCodeSVG value={qrToken} size={220} level="M" includeMargin />
                 </div>
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 flex items-center justify-between gap-3">
-                  <p className="text-sm font-mono text-blue-100 break-all">{qrToken}</p>
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 flex items-center justify-between gap-3">
+                  <p className="text-xs font-mono text-blue-100 break-all">{qrToken}</p>
                   <button
                     type="button"
                     onClick={() => navigator.clipboard.writeText(qrToken)}
-                    className="p-2 rounded hover:bg-blue-500/20 text-blue-300"
+                    className="p-2 rounded hover:bg-blue-500/20 text-blue-300 shrink-0"
                     title="Copy token"
                   >
                     <Copy className="w-4 h-4" />
                   </button>
                 </div>
                 <p className="text-xs text-zinc-400 mt-3">
-                  Share this token with the visitor — they enter it at the kiosk or in the mobile app.
+                  Scan with the kiosk camera or paste token into the mobile app.
+                  <br />
                   Visit ID: <span className="font-mono">{visitId}</span>
                 </p>
               </div>
             ) : (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl h-full flex flex-col items-center justify-center text-center">
-                <AlertCircle className="w-16 h-16 text-zinc-400 mb-4" />
-                <p className="text-zinc-400">
-                  Fill out the form and submit to create a visit and get a QR token.
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl text-center">
+                <AlertCircle className="w-10 h-10 text-zinc-400 mb-3 mx-auto" />
+                <p className="text-sm text-zinc-400">
+                  Submit the form to create the visit and generate a scannable QR.
                 </p>
               </div>
             )}

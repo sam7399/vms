@@ -7,6 +7,7 @@ import { LiveHeadcountCard } from "@/components/dashboard/LiveHeadcountCard";
 import { VisitorsTable } from "@/components/dashboard/VisitorsTable";
 import { ComplianceStatus } from "@/components/dashboard/ComplianceStatus";
 import { BranchFilter } from "@/components/dashboard/BranchFilter";
+import { ComplianceAlerts } from "@/components/dashboard/ComplianceAlerts";
 import { DashboardHeader } from "@/components/dashboard-header";
 
 export default function DashboardPage() {
@@ -47,6 +48,8 @@ export default function DashboardPage() {
         <div className="mt-4">
           <LiveHeadcountCard branchId={branchId} />
         </div>
+
+        <ComplianceAlerts />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8 pb-12">
           <div className="lg:col-span-2">

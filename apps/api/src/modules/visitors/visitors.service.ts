@@ -5,6 +5,19 @@ import { HeadcountGateway } from '../../gateways/headcount.gateway';
 
 const prisma = new PrismaClient();
 
+// Strip "data:image/jpeg;base64," prefix and convert to Buffer for Prisma Bytes.
+// Returns undefined for empty input so Prisma leaves the column null.
+function parsePhotoBase64(input?: string | null): Buffer | undefined {
+  if (!input) return undefined;
+  const cleaned = input.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
+  if (cleaned.length === 0) return undefined;
+  try {
+    return Buffer.from(cleaned, 'base64');
+  } catch {
+    return undefined;
+  }
+}
+
 @Injectable()
 export class VisitorsService {
   constructor(private readonly headcount: HeadcountGateway) {}
@@ -21,7 +34,7 @@ export class VisitorsService {
         expectedEntry: new Date(data.expectedEntry),
         vehicleNumber: data.vehicleNumber,
         qrCodeToken: qrToken,
-        status: VisitStatus.PENDING,
+        status: data.status === 'APPROVED' ? VisitStatus.APPROVED : VisitStatus.PENDING,
       },
     });
   }
@@ -34,6 +47,18 @@ export class VisitorsService {
         host: { select: { id: true, fullName: true, email: true } },
       },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getPendingVisits() {
+    return prisma.visit.findMany({
+      where: { status: VisitStatus.PENDING },
+      include: {
+        visitor: true,
+        host: { select: { id: true, fullName: true, email: true } },
+        branch: { select: { id: true, name: true, location: true } },
+      },
+      orderBy: { expectedEntry: 'asc' },
     });
   }
 
@@ -81,6 +106,7 @@ export class VisitorsService {
         company: data.company,
         documentType: data.documentType,
         documentNumber: data.documentNumber,
+        faceData: parsePhotoBase64(data.photoBase64),
       },
     });
   }

@@ -15,6 +15,11 @@ export class ComplianceController {
     return this.complianceService.getAllComplianceStatus();
   }
 
+  @Get('alerts')
+  getAlerts() {
+    return this.complianceService.getExpiringSoon(30);
+  }
+
   @Get('worker/:workerId')
   getWorkerCompliance(@Param('workerId') workerId: string) {
     return this.complianceService.getWorkerCompliance(workerId);

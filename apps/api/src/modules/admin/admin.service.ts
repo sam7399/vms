@@ -59,6 +59,13 @@ export class AdminService {
     });
   }
 
+  listAuditLogs(limit = 200) {
+    return prisma.auditLog.findMany({
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   // --- Write operations -------------------------------------------
   async createContractor(data: {
     organizationId?: string;
