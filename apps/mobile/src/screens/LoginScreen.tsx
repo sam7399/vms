@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { api, setSession, SessionUser } from "../api";
+import { useI18n } from "../i18n";
 
 interface Props {
   onLoggedIn: (user: SessionUser) => void;
@@ -18,8 +19,11 @@ interface Props {
 }
 
 export function LoginScreen({ onLoggedIn, onContinueAsGate }: Props) {
+  const { t, lang, setLang } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [totp, setTotp] = useState("");
+  const [needTotp, setNeedTotp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -27,9 +31,13 @@ export function LoginScreen({ onLoggedIn, onContinueAsGate }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const r = await api.login(email.trim(), password);
-      await setSession(r.accessToken, r.user);
-      onLoggedIn(r.user);
+      const r = await api.login(email.trim(), password, needTotp ? totp : undefined);
+      if ("totpRequired" in r) {
+        setNeedTotp(true);
+      } else {
+        await setSession(r.accessToken, r.user);
+        onLoggedIn(r.user);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Login failed");
     } finally {
@@ -43,11 +51,21 @@ export function LoginScreen({ onLoggedIn, onContinueAsGate }: Props) {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.container}
       >
-        <Text style={styles.title}>VMS Mobile</Text>
-        <Text style={styles.subtitle}>Sign in as a host to approve visits.</Text>
+        <View style={styles.langRow}>
+          <Pressable onPress={() => setLang("en")} style={styles.langBtn}>
+            <Text style={lang === "en" ? styles.langActive : styles.langInactive}>EN</Text>
+          </Pressable>
+          <Text style={{ color: "#475569" }}>·</Text>
+          <Pressable onPress={() => setLang("hi")} style={styles.langBtn}>
+            <Text style={lang === "hi" ? styles.langActive : styles.langInactive}>हि</Text>
+          </Pressable>
+        </View>
+
+        <Text style={styles.title}>VMS</Text>
+        <Text style={styles.subtitle}>The Studio Infinito · {t("auth.signIn")}</Text>
 
         <View style={styles.card}>
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>{t("auth.email")}</Text>
           <TextInput
             style={styles.input}
             value={email}
@@ -57,8 +75,9 @@ export function LoginScreen({ onLoggedIn, onContinueAsGate }: Props) {
             keyboardType="email-address"
             placeholder="host@demo.local"
             placeholderTextColor="#64748b"
+            editable={!needTotp}
           />
-          <Text style={styles.label}>Password</Text>
+          <Text style={styles.label}>{t("auth.password")}</Text>
           <TextInput
             style={styles.input}
             value={password}
@@ -66,19 +85,45 @@ export function LoginScreen({ onLoggedIn, onContinueAsGate }: Props) {
             secureTextEntry
             placeholder="••••••"
             placeholderTextColor="#64748b"
+            editable={!needTotp}
           />
+          {needTotp && (
+            <>
+              <Text style={styles.label}>{t("auth.totp")}</Text>
+              <TextInput
+                style={[styles.input, styles.totpInput]}
+                value={totp}
+                onChangeText={(v) => setTotp(v.replace(/\D/g, "").slice(0, 6))}
+                keyboardType="numeric"
+                placeholder="000000"
+                placeholderTextColor="#64748b"
+                maxLength={6}
+                autoFocus
+              />
+            </>
+          )}
           {error && <Text style={styles.error}>{error}</Text>}
           <Pressable
-            style={[styles.button, (loading || !email || !password) && styles.disabled]}
+            style={[
+              styles.button,
+              (loading || !email || !password || (needTotp && totp.length !== 6)) &&
+                styles.disabled,
+            ]}
             onPress={submit}
-            disabled={loading || !email || !password}
+            disabled={
+              loading || !email || !password || (needTotp && totp.length !== 6)
+            }
           >
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign in</Text>}
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>{t("auth.signIn")}</Text>
+            )}
           </Pressable>
         </View>
 
         <Pressable onPress={onContinueAsGate} style={styles.gateBtn}>
-          <Text style={styles.gateText}>Skip — use as gate kiosk (check-in only)</Text>
+          <Text style={styles.gateText}>{t("auth.gateMode")}</Text>
         </Pressable>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -86,32 +131,55 @@ export function LoginScreen({ onLoggedIn, onContinueAsGate }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0f172a" },
+  safe: { flex: 1, backgroundColor: "#0a071a" },
   container: { flex: 1, padding: 24, justifyContent: "center" },
-  title: { color: "#f8fafc", fontSize: 32, fontWeight: "700" },
-  subtitle: { color: "#94a3b8", fontSize: 14, marginBottom: 32 },
+  langRow: {
+    position: "absolute",
+    top: 50,
+    right: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  langBtn: { paddingHorizontal: 6, paddingVertical: 2 },
+  langActive: { color: "#a78bfa", fontWeight: "600" },
+  langInactive: { color: "#475569" },
+  title: { color: "#f8fafc", fontSize: 40, fontWeight: "800", letterSpacing: -1 },
+  subtitle: { color: "#94a3b8", fontSize: 13, marginBottom: 32 },
   card: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 18,
     padding: 20,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
-  label: { color: "#cbd5e1", fontSize: 12, marginBottom: 6, marginTop: 10, textTransform: "uppercase" },
+  label: {
+    color: "#cbd5e1",
+    fontSize: 11,
+    marginBottom: 6,
+    marginTop: 10,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
   input: {
-    backgroundColor: "#020617",
+    backgroundColor: "#070418",
     color: "#f8fafc",
-    borderRadius: 8,
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 16,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
+  totpInput: {
+    textAlign: "center",
+    fontSize: 22,
+    letterSpacing: 6,
+  },
   error: { color: "#fca5a5", marginTop: 12, fontSize: 13 },
   button: {
-    backgroundColor: "#3b82f6",
-    borderRadius: 8,
+    backgroundColor: "#7c3aed",
+    borderRadius: 12,
     paddingVertical: 14,
     alignItems: "center",
     marginTop: 18,
@@ -119,5 +187,5 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.5 },
   buttonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
   gateBtn: { marginTop: 24, padding: 12, alignItems: "center" },
-  gateText: { color: "#60a5fa", fontSize: 13 },
+  gateText: { color: "#a78bfa", fontSize: 13 },
 });

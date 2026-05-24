@@ -63,10 +63,13 @@ async function request<T>(
 }
 
 export const api = {
-  login: (email: string, password: string) =>
-    request<{ accessToken: string; user: SessionUser }>("/auth/login", {
+  login: (email: string, password: string, totp?: string) =>
+    request<
+      | { accessToken: string; user: SessionUser }
+      | { totpRequired: true }
+    >("/auth/login", {
       method: "POST",
-      body: { email, password },
+      body: { email, password, totp },
       auth: false,
     }),
   checkIn: (qrCodeToken: string) =>
@@ -102,5 +105,30 @@ export const api = {
     request<any>("/gate/worker-check-out", {
       method: "POST",
       body: { workerId },
+    }),
+
+  // Pre-approve / invite (host)
+  listBranches: () => request<any[]>("/admin/branches"),
+  listHosts: () => request<any[]>("/admin/hosts"),
+  createVisitor: (data: any) =>
+    request<{ id: string }>("/visitors", { method: "POST", body: data }),
+  createVisit: (data: any) =>
+    request<{ id: string; qrCodeToken: string }>("/visitors/visit", {
+      method: "POST",
+      body: data,
+    }),
+
+  // Dashboard counts
+  headcount: () =>
+    request<{ total: number; visitors: number; workers: number; employees: number }>(
+      "/visitors/headcount",
+    ),
+
+  // Face match
+  faceIdentify: (embedding: number[]) =>
+    request<any>("/face/identify", {
+      method: "POST",
+      body: { embedding },
+      auth: false,
     }),
 };
