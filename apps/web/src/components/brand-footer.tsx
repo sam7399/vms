@@ -10,14 +10,16 @@ export function BrandFooter() {
           VMS · Enterprise Visitor &amp; Workforce Management
         </p>
         <div className="text-center md:text-right">
-          Crafted by{' '}
+          Built by{' '}
+          <span className="text-brand-400 font-medium">Personify Crafters</span>{' '}
+          for{' '}
           <Link
             href="https://thestudioinfinito.com"
             className="text-brand-400 hover:text-brand-300"
             target="_blank"
             rel="noopener noreferrer"
           >
-            TheStudioInfinito
+            The Studio Infinito
           </Link>
         </div>
       </div>

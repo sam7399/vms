@@ -6,48 +6,55 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // TheStudioInfinito brand palette
+        // The Studio Infinito brand — pulled from the logo
+        // Deep violet "S" → magenta swirl → warm orange tail
         brand: {
-          50: '#eef2ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#6366f1', // primary (indigo-500)
-          600: '#4f46e5',
-          700: '#4338ca',
-          800: '#3730a3',
-          900: '#312e81',
-          950: '#1e1b4b',
+          50: '#f5f3ff',
+          100: '#ede9fe',
+          200: '#ddd6fe',
+          300: '#c4b5fd',
+          400: '#a78bfa',
+          500: '#8b5cf6',
+          600: '#7c3aed', // primary (matches their AMS theme-color)
+          700: '#6d28d9',
+          800: '#5b21b6',
+          900: '#4c1d95',
+          950: '#2e1065',
         },
         accent: {
-          50: '#ecfeff',
-          100: '#cffafe',
-          200: '#a5f3fc',
-          300: '#67e8f9',
-          400: '#22d3ee', // accent (cyan-400)
-          500: '#06b6d4',
-          600: '#0891b2',
-          700: '#0e7490',
-          800: '#155e75',
-          900: '#164e63',
+          50: '#fff7ed',
+          100: '#ffedd5',
+          200: '#fed7aa',
+          300: '#fdba74',
+          400: '#fb923c', // warm orange tail of the logo
+          500: '#f97316',
+          600: '#ea580c',
+          700: '#c2410c',
+          800: '#9a3412',
+          900: '#7c2d12',
+        },
+        magenta: {
+          400: '#e879f9',
+          500: '#d946ef',
+          600: '#c026d3', // mid-tone in the logo gradient
+          700: '#a21caf',
         },
         surface: {
-          DEFAULT: '#0b0d1f',
+          DEFAULT: '#0e0a1f',
           50: '#f8fafc',
-          900: '#0f1226',
-          950: '#070818',
+          900: '#15102a',
+          950: '#0a071a',
         },
       },
       backgroundImage: {
         'brand-gradient':
-          'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%)',
+          'linear-gradient(135deg, #7c3aed 0%, #c026d3 50%, #fb923c 100%)',
         'brand-radial':
-          'radial-gradient(ellipse at top, rgba(99,102,241,0.18), transparent 60%), radial-gradient(ellipse at bottom right, rgba(6,182,212,0.10), transparent 60%)',
+          'radial-gradient(ellipse at top, rgba(124,58,237,0.18), transparent 60%), radial-gradient(ellipse at bottom right, rgba(251,146,60,0.10), transparent 60%)',
       },
       boxShadow: {
-        brand: '0 10px 40px -10px rgba(99, 102, 241, 0.4)',
-        'brand-glow': '0 0 0 1px rgba(99,102,241,0.4), 0 8px 30px rgba(99,102,241,0.25)',
+        brand: '0 10px 40px -10px rgba(124, 58, 237, 0.45)',
+        'brand-glow': '0 0 0 1px rgba(124,58,237,0.4), 0 8px 30px rgba(192,38,211,0.25)',
       },
       borderRadius: {
         lg: 'var(--radius)',

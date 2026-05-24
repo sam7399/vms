@@ -14,18 +14,18 @@ export function Logo({ size = 36, showWordmark = true, href = '/', className = '
   const inner = (
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
       <Image
-        src="/logo.svg"
-        alt="TheStudioInfinito"
+        src="/logo.png"
+        alt="The Studio Infinito"
         width={size}
         height={size}
         priority
-        className="rounded-lg shadow-brand-glow"
+        className="rounded-lg"
       />
       {showWordmark && (
         <span className="flex flex-col leading-tight">
           <span className="text-lg font-semibold text-white tracking-tight">VMS</span>
           <span className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
-            TheStudioInfinito
+            The Studio Infinito
           </span>
         </span>
       )}

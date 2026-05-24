@@ -50,7 +50,7 @@ export default function LoginPage() {
           </h1>
           <p className="mt-4 text-white/80">
             Real-time gate intelligence, contract workforce ops, compliance + audit,
-            face recognition. Built by TheStudioInfinito.
+            face recognition. Built by Personify Crafters for The Studio Infinito.
           </p>
           <div className="mt-10 grid grid-cols-2 gap-3 text-xs text-white/80">
             <Feat label="Real-time headcount" />

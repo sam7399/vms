@@ -6,10 +6,19 @@ import { BrandFooter } from "@/components/brand-footer";
 import { NotificationToaster } from "@/components/notification-toaster";
 
 export const metadata: Metadata = {
-  title: "VMS · TheStudioInfinito",
+  title: "VMS — Visitor Management System | TSI by Personify Crafters",
   description:
-    "Enterprise visitor & contractor workforce management — TheStudioInfinito",
-  icons: { icon: "/favicon.svg" },
+    "Enterprise Visitor & Workforce Management — Built by Personify Crafters for The Studio Infinito.",
+  authors: [{ name: "Personify Crafters" }],
+  themeColor: "#7c3aed",
+  openGraph: {
+    title: "VMS — Visitor Management System | TSI",
+    description:
+      "Enterprise visitor & workforce management by Personify Crafters for The Studio Infinito.",
+    type: "website",
+    siteName: "The Studio Infinito VMS",
+  },
+  icons: { icon: "/favicon.png" },
 };
 
 export default function RootLayout({

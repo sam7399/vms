@@ -31,7 +31,7 @@ const EN: Record<string, string> = {
 
   // Top-bar
   'topbar.lang': 'Language',
-  'topbar.subtitle': 'Enterprise Visitor & Workforce Management',
+  'topbar.subtitle': 'TSI · Visitor & Workforce Management',
 
   // Status labels
   'status.PENDING': 'Pending',
