@@ -59,3 +59,11 @@ export async function apiPut<T>(path: string, body?: any): Promise<T> {
   });
   return handle<T>(res);
 }
+
+export async function apiDelete<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "DELETE",
+    headers: { ...authHeader() },
+  });
+  return handle<T>(res);
+}

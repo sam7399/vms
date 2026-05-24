@@ -56,11 +56,58 @@ model Branch {
   users          User[]
   visits         Visit[]
   attendance     Attendance[]
+  shifts         Shift[]
+  parkingSlots   ParkingSlot[]
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   @@index([organizationId])
   @@index([name])
+}
+
+model Shift {
+  id          String       @id @default(uuid())
+  branchId    String
+  name        String       @db.VarChar(100)  // "Morning", "Evening", "Night"
+  startTime   String       @db.VarChar(5)    // "06:00"
+  endTime     String       @db.VarChar(5)    // "14:00"
+  isActive    Boolean      @default(true)
+  branch      Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  assignments WorkerShift[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([branchId, name])
+  @@index([branchId])
+}
+
+model WorkerShift {
+  id        String   @id @default(uuid())
+  workerId  String
+  shiftId   String
+  assignedAt DateTime @default(now())
+
+  worker    Worker  @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  shift     Shift   @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@unique([workerId, shiftId])
+  @@index([workerId])
+  @@index([shiftId])
+}
+
+model ParkingSlot {
+  id        String   @id @default(uuid())
+  branchId  String
+  label     String   @db.VarChar(50)   // "A-12"
+  zone      String?  @db.VarChar(50)   // "Visitor", "Staff", "Loading"
+  isActive  Boolean  @default(true)
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  visits    Visit[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([branchId, label])
+  @@index([branchId])
 }
 
 model User {
@@ -102,23 +149,25 @@ model Visitor {
 }
 
 model Visit {
-  id            String      @id @default(uuid())
-  visitorId     String
-  branchId      String
-  hostId        String
-  purpose       String      @db.VarChar(500)
-  status        VisitStatus @default(PENDING)
-  expectedEntry DateTime
-  actualEntry   DateTime?
-  actualExit    DateTime?
-  vehicleNumber String?     @db.VarChar(50)
-  qrCodeToken   String      @unique @db.VarChar(500)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id             String      @id @default(uuid())
+  visitorId      String
+  branchId       String
+  hostId         String
+  purpose        String      @db.VarChar(500)
+  status         VisitStatus @default(PENDING)
+  expectedEntry  DateTime
+  actualEntry    DateTime?
+  actualExit     DateTime?
+  vehicleNumber  String?     @db.VarChar(50)
+  qrCodeToken    String      @unique @db.VarChar(500)
+  parkingSlotId  String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
-  visitor       Visitor     @relation(fields: [visitorId], references: [id], onDelete: Cascade)
-  branch        Branch      @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  host          User        @relation("HostToVisit", fields: [hostId], references: [id], onDelete: Restrict)
+  visitor        Visitor     @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  branch         Branch      @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  host           User        @relation("HostToVisit", fields: [hostId], references: [id], onDelete: Restrict)
+  parkingSlot    ParkingSlot? @relation(fields: [parkingSlotId], references: [id], onDelete: SetNull)
   materialPasses MaterialGatePass[]
 
   @@index([visitorId])
@@ -126,6 +175,7 @@ model Visit {
   @@index([hostId])
   @@index([status])
   @@index([expectedEntry])
+  @@index([parkingSlotId])
 }
 
 enum PassDirection {
@@ -179,6 +229,7 @@ model Worker {
   isActive       Boolean   @default(true)
   contractor     Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
   attendance     Attendance[]
+  shifts         WorkerShift[]
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
