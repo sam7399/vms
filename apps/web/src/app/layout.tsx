@@ -6,9 +6,10 @@ import { BrandFooter } from "@/components/brand-footer";
 import { NotificationToaster } from "@/components/notification-toaster";
 
 export const metadata: Metadata = {
-  title: "VMS · Enterprise Visitor & Workforce Management",
+  title: "VMS · TheStudioInfinito",
   description:
-    "Real-time visitor and contractor workforce management — by TheStudioInfinito × Personify Crafters",
+    "Enterprise visitor & contractor workforce management — TheStudioInfinito",
+  icons: { icon: "/favicon.svg" },
 };
 
 export default function RootLayout({
@@ -21,11 +22,20 @@ export default function RootLayout({
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
-      <body suppressHydrationWarning>
+      <body suppressHydrationWarning className="bg-surface-950">
         <I18nProvider>
           <AuthProvider>
-            <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-              <div className="flex-1">{children}</div>
+            <div className="relative min-h-screen flex flex-col bg-surface-950 text-white overflow-x-hidden">
+              {/* Ambient brand backdrop */}
+              <div
+                aria-hidden
+                className="pointer-events-none fixed inset-0 z-0 bg-brand-radial"
+              />
+              <div
+                aria-hidden
+                className="pointer-events-none fixed inset-x-0 top-0 h-px bg-brand-gradient z-50"
+              />
+              <div className="relative z-10 flex-1">{children}</div>
               <BrandFooter />
             </div>
             <NotificationToaster />

@@ -47,7 +47,12 @@ export default function DashboardPage() {
 
       <div className="max-w-7xl mx-auto px-6">
         <div className="mt-8 flex items-center justify-between gap-4 flex-wrap">
-          <h2 className="text-xl font-semibold text-white">{t('dash.liveOccupancy')}</h2>
+          <div>
+            <h2 className="text-2xl font-semibold text-white tracking-tight">
+              {t('dash.liveOccupancy')}
+            </h2>
+            <div className="mt-2 h-1 w-16 rounded-full bg-brand-gradient" />
+          </div>
           <BranchFilter value={branchId} onChange={setBranchId} />
         </div>
         <div className="mt-4">

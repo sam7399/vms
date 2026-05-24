@@ -1,24 +1,24 @@
 import Link from 'next/link';
+import { Logo } from '@/components/logo';
 
 export function BrandFooter() {
   return (
-    <footer className="border-t border-white/5 mt-12 py-6 text-xs text-zinc-500">
-      <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-blue-500" />
-          <span>VMS · Enterprise Visitor &amp; Workforce Management</span>
-        </div>
+    <footer className="relative z-10 border-t border-white/[0.06] mt-16 py-7 text-xs text-zinc-500 bg-surface-950/60 backdrop-blur">
+      <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+        <Logo size={26} showWordmark={false} href="" />
+        <p className="text-center md:text-left">
+          VMS · Enterprise Visitor &amp; Workforce Management
+        </p>
         <div className="text-center md:text-right">
           Crafted by{' '}
           <Link
             href="https://thestudioinfinito.com"
-            className="text-blue-400 hover:underline"
+            className="text-brand-400 hover:text-brand-300"
             target="_blank"
             rel="noopener noreferrer"
           >
             TheStudioInfinito
-          </Link>{' '}
-          &amp; Personify Crafters
+          </Link>
         </div>
       </div>
     </footer>

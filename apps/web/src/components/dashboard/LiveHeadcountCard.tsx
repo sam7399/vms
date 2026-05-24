@@ -58,10 +58,10 @@ export function LiveHeadcountCard({ branchId = "" }: { branchId?: string }) {
   }, [branchId]);
 
   const cards = [
-    { label: t('dash.totalInside'), count: data.total, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
-    { label: t('dash.visitorsInside'), count: data.visitors, icon: UserCheck, color: "text-purple-500", bg: "bg-purple-500/10" },
-    { label: t('dash.contractorsInside'), count: data.workers, icon: HardHat, color: "text-orange-500", bg: "bg-orange-500/10" },
-    { label: t('dash.employeesInside'), count: data.employees, icon: Briefcase, color: "text-green-500", bg: "bg-green-500/10" },
+    { label: t('dash.totalInside'), count: data.total, icon: Users, color: "text-brand-300", bg: "bg-brand-500/10", accent: "bg-brand-gradient" },
+    { label: t('dash.visitorsInside'), count: data.visitors, icon: UserCheck, color: "text-violet-300", bg: "bg-violet-500/10", accent: "bg-violet-500/40" },
+    { label: t('dash.contractorsInside'), count: data.workers, icon: HardHat, color: "text-amber-300", bg: "bg-amber-500/10", accent: "bg-amber-500/40" },
+    { label: t('dash.employeesInside'), count: data.employees, icon: Briefcase, color: "text-accent-300", bg: "bg-accent-500/10", accent: "bg-accent-500/40" },
   ];
 
   if (!mounted) return null;
@@ -87,8 +87,12 @@ export function LiveHeadcountCard({ branchId = "" }: { branchId?: string }) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1, duration: 0.5 }}
-            className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl shadow-2xl hover:bg-white/10 transition-colors duration-300"
+            className="group relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6 backdrop-blur-xl hover:border-white/[0.16] hover:bg-white/[0.06] transition-all duration-300"
           >
+            <div
+              aria-hidden
+              className={`absolute top-0 left-0 right-0 h-0.5 ${stat.accent}`}
+            />
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-zinc-400">{stat.label}</p>

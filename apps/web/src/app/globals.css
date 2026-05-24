@@ -3,10 +3,34 @@
 @tailwind utilities;
 
 :root {
-  --background: 220deg 13% 13%;
-  --foreground: 213deg 31% 91%;
+  --background: 234deg 37% 7%;
+  --foreground: 210deg 20% 96%;
 }
 
 body {
-  @apply bg-background text-foreground;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+/* Smoother fonts */
+html, body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar to match the brand */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.25);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.4);
 }

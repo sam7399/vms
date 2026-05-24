@@ -70,13 +70,13 @@ export function NavMenu() {
   return (
     <nav
       ref={rootRef}
-      className="flex items-center gap-1 -mx-6 px-6 pt-4 border-t border-white/10 flex-wrap relative"
+      className="flex items-center gap-1 -mx-6 px-6 mt-3 pt-3 border-t border-white/[0.06] flex-wrap relative"
     >
       <Link
         href="/"
-        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-zinc-300 hover:text-white hover:bg-white/10"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-300 hover:text-white hover:bg-white/[0.06]"
       >
-        <LayoutDashboard className="w-4 h-4" /> {t('nav.dashboard')}
+        <LayoutDashboard className="w-4 h-4 text-brand-400" /> {t('nav.dashboard')}
       </Link>
 
       {CATEGORIES.map((cat) => {
@@ -90,13 +90,13 @@ export function NavMenu() {
                 e.stopPropagation();
                 setOpen(isOpen ? null : cat.key);
               }}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 isOpen
-                  ? 'bg-white/10 text-white'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/10'
+                  ? 'bg-brand-500/15 text-white ring-1 ring-brand-500/30'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-4 h-4 text-brand-400" />
               {t(cat.key)}
               <ChevronDown
                 className={`w-3.5 h-3.5 transition-transform ${
@@ -105,13 +105,16 @@ export function NavMenu() {
               />
             </button>
             {isOpen && (
-              <div className="absolute top-full left-0 mt-1 min-w-[220px] rounded-xl border border-white/10 bg-slate-900/95 backdrop-blur-xl shadow-2xl py-2 z-50">
+              <div className="absolute top-full left-0 mt-1.5 min-w-[230px] rounded-xl border border-white/[0.08] bg-surface-900/95 backdrop-blur-xl shadow-2xl shadow-brand-500/10 py-2 z-50 overflow-hidden">
+                <div className="px-3 pb-2 text-[10px] uppercase tracking-wider text-zinc-500 border-b border-white/[0.04] mb-1">
+                  {t(cat.key)}
+                </div>
                 {cat.items.map((it) => (
                   <Link
                     key={it.href}
                     href={it.href}
                     onClick={() => setOpen(null)}
-                    className="block px-4 py-2 text-sm text-zinc-300 hover:bg-white/10 hover:text-white"
+                    className="block px-4 py-2 text-sm text-zinc-300 hover:bg-brand-500/10 hover:text-white"
                   >
                     {t(it.key)}
                   </Link>
@@ -124,13 +127,13 @@ export function NavMenu() {
 
       <Link
         href="/help"
-        className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/10"
+        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/[0.06]"
       >
         <BookOpen className="w-4 h-4" /> {t('nav.help')}
       </Link>
       <Link
         href="/settings"
-        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/10"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/[0.06]"
       >
         <SettingsIcon className="w-4 h-4" /> {t('nav.settings')}
       </Link>
