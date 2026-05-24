@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
+import { I18nProvider } from "@/lib/i18n";
 import { BrandFooter } from "@/components/brand-footer";
 import { NotificationToaster } from "@/components/notification-toaster";
 
@@ -21,13 +22,15 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body suppressHydrationWarning>
-        <AuthProvider>
-          <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-            <div className="flex-1">{children}</div>
-            <BrandFooter />
-          </div>
-          <NotificationToaster />
-        </AuthProvider>
+        <I18nProvider>
+          <AuthProvider>
+            <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+              <div className="flex-1">{children}</div>
+              <BrandFooter />
+            </div>
+            <NotificationToaster />
+          </AuthProvider>
+        </I18nProvider>
       </body>
     </html>
   );

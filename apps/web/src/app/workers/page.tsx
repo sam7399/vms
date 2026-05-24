@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Plus, ShieldCheck, ShieldOff, HardHat, LogIn, LogOut } from 'lucide-react';
 import { apiGet, apiPost } from '@/lib/api';
+import { FaceEnrollButton } from '@/components/face-enroll-button';
 
 export default function WorkersPage() {
   return (
@@ -363,25 +364,28 @@ function WorkersPageInner() {
                       )}
                     </td>
                     <td className="p-4">
-                      {openAttendance[w.id] ? (
-                        <button
-                          onClick={() => toggleAttendance(w)}
-                          disabled={busyId === w.id}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-zinc-500/15 hover:bg-zinc-500/25 text-zinc-200 text-xs font-medium disabled:opacity-50"
-                          title="Check out"
-                        >
-                          <LogOut className="w-3.5 h-3.5" /> On site · check out
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => toggleAttendance(w)}
-                          disabled={busyId === w.id}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-green-600/80 hover:bg-green-600 text-white text-xs font-medium disabled:opacity-50"
-                          title="Mark on site"
-                        >
-                          <LogIn className="w-3.5 h-3.5" /> Mark on site
-                        </button>
-                      )}
+                      <div className="flex flex-wrap gap-1.5">
+                        {openAttendance[w.id] ? (
+                          <button
+                            onClick={() => toggleAttendance(w)}
+                            disabled={busyId === w.id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-zinc-500/15 hover:bg-zinc-500/25 text-zinc-200 text-xs font-medium disabled:opacity-50"
+                            title="Check out"
+                          >
+                            <LogOut className="w-3.5 h-3.5" /> Check out
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => toggleAttendance(w)}
+                            disabled={busyId === w.id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-green-600/80 hover:bg-green-600 text-white text-xs font-medium disabled:opacity-50"
+                            title="Mark on site"
+                          >
+                            <LogIn className="w-3.5 h-3.5" /> On site
+                          </button>
+                        )}
+                        <FaceEnrollButton kind="worker" id={w.id} label="Face" />
+                      </div>
                     </td>
                   </tr>
                 ))}

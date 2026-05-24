@@ -9,6 +9,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { apiGet, apiPost } from '@/lib/api';
 import { WebcamCapture } from '@/components/webcam-capture';
 import { downloadBadgePDF } from '@/lib/badge';
+import { describeFace } from '@/lib/face-api-loader';
 
 interface Branch { id: string; name: string; location: string }
 interface Host { id: string; fullName: string; email: string; role: string; branchId: string }
@@ -98,6 +99,27 @@ export default function CheckInPage() {
         documentNumber: form.documentNumber,
         photoBase64: photo || undefined,
       });
+
+      // Best-effort: if a photo was captured, also compute face embedding
+      // and enroll it for recognition. Never block visit creation on this.
+      if (photo) {
+        (async () => {
+          try {
+            const img = new Image();
+            await new Promise<void>((resolve, reject) => {
+              img.onload = () => resolve();
+              img.onerror = () => reject(new Error('image load failed'));
+              img.src = photo;
+            });
+            const embedding = await describeFace(img);
+            if (embedding) {
+              await apiPost(`/face/enroll/visitor/${visitor.id}`, { embedding });
+            }
+          } catch {
+            /* face-api unavailable or no face detected — silent */
+          }
+        })();
+      }
 
       const visit = await apiPost<VisitResponse>('/visitors/visit', {
         visitorId: visitor.id,

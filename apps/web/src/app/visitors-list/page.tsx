@@ -7,6 +7,7 @@ import { DashboardHeader } from '@/components/dashboard-header';
 import { Search, ShieldX, ShieldCheck, Users, Download } from 'lucide-react';
 import { apiGet, apiPut } from '@/lib/api';
 import { downloadCSV } from '@/lib/csv';
+import { FaceEnrollButton } from '@/components/face-enroll-button';
 
 interface Visitor {
   id: string;
@@ -209,17 +210,20 @@ export default function VisitorsListPage() {
                         )}
                       </td>
                       <td className="p-4 text-right">
-                        <button
-                          onClick={() => toggleBlacklist(v)}
-                          disabled={busyId === v.id}
-                          className={`px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50 ${
-                            v.isBlacklisted
-                              ? 'bg-green-600/80 hover:bg-green-600 text-white'
-                              : 'bg-red-600/80 hover:bg-red-600 text-white'
-                          }`}
-                        >
-                          {v.isBlacklisted ? 'Remove from blacklist' : 'Blacklist'}
-                        </button>
+                        <div className="flex justify-end gap-2 flex-wrap">
+                          <FaceEnrollButton kind="visitor" id={v.id} label="Face" />
+                          <button
+                            onClick={() => toggleBlacklist(v)}
+                            disabled={busyId === v.id}
+                            className={`px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50 ${
+                              v.isBlacklisted
+                                ? 'bg-green-600/80 hover:bg-green-600 text-white'
+                                : 'bg-red-600/80 hover:bg-red-600 text-white'
+                            }`}
+                          >
+                            {v.isBlacklisted ? 'Un-blacklist' : 'Blacklist'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
