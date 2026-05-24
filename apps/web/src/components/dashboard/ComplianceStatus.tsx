@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { AlertCircle, CheckCircle2, Zap } from "lucide-react";
 import { apiGet } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
 interface ComplianceRow {
   contractorId: string;
@@ -23,6 +24,7 @@ function StatusIcon({ score }: { score: number }) {
 }
 
 export function ComplianceStatus() {
+  const { t } = useI18n();
   const [rows, setRows] = useState<ComplianceRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +50,7 @@ export function ComplianceStatus() {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6">
       <h3 className="text-lg font-semibold text-white mb-6">
-        Compliance Status
+        {t('dash.complianceStatus')}
       </h3>
 
       {error && (
@@ -82,7 +84,7 @@ export function ComplianceStatus() {
                 {row.companyName}
               </p>
               <p className="text-sm text-zinc-400">
-                {row.compliantWorkers} / {row.totalWorkers} workers compliant
+                {t('dash.compliantOf', { a: row.compliantWorkers, b: row.totalWorkers })}
               </p>
             </div>
             <div className="text-right">

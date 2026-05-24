@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Clock, Plus, UserPlus, X, Users } from 'lucide-react';
 import { apiGet, apiPost, apiDelete } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 
 interface Branch { id: string; name: string }
 interface Worker { id: string; fullName: string; skillCategory: string; contractor?: { companyName: string } }
@@ -26,6 +27,7 @@ interface Assignment {
 
 export default function ShiftsPage() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const [shifts, setShifts] = useState<Shift[] | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -125,7 +127,7 @@ export default function ShiftsPage() {
           <div>
             <div className="flex items-center gap-3">
               <Clock className="w-7 h-7 text-blue-400" />
-              <h2 className="text-3xl font-bold text-white">Shifts</h2>
+              <h2 className="text-3xl font-bold text-white">{t('shifts.title')}</h2>
               {shifts && (
                 <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-300 text-sm">
                   {shifts.length}
@@ -133,14 +135,14 @@ export default function ShiftsPage() {
               )}
             </div>
             <p className="text-zinc-400 mt-2">
-              Define shifts per branch and assign workers to them.
+              {t('shifts.subtitle')}
             </p>
           </div>
           <button
             onClick={() => setShowForm(!showForm)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium"
           >
-            <Plus className="w-4 h-4" /> New shift
+            <Plus className="w-4 h-4" /> {t('shifts.new')}
           </button>
         </div>
 

@@ -3,31 +3,8 @@
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { LogOut, User, Globe } from 'lucide-react';
-import Link from 'next/link';
 import { useI18n } from '@/lib/i18n';
-
-interface NavLink {
-  href: string;
-  key: string;
-  pushRight?: boolean;
-}
-
-const LINKS: NavLink[] = [
-  { href: '/', key: 'nav.dashboard' },
-  { href: '/check-in', key: 'nav.checkIn' },
-  { href: '/visitors-list', key: 'nav.visitors' },
-  { href: '/contractors', key: 'nav.contractors' },
-  { href: '/workers', key: 'nav.workers' },
-  { href: '/shifts', key: 'nav.shifts' },
-  { href: '/parking', key: 'nav.parking' },
-  { href: '/vehicles', key: 'nav.vehicles' },
-  { href: '/material-pass', key: 'nav.materials' },
-  { href: '/approvals', key: 'nav.approvals' },
-  { href: '/reports', key: 'nav.reports' },
-  { href: '/audit', key: 'nav.audit' },
-  { href: '/help', key: 'nav.help', pushRight: true },
-  { href: '/settings', key: 'nav.settings' },
-];
+import { NavMenu } from '@/components/nav-menu';
 
 export function DashboardHeader() {
   const { user, logout } = useAuth();
@@ -47,7 +24,7 @@ export function DashboardHeader() {
         <div className="flex items-center justify-between gap-8 mb-4">
           <div>
             <h1 className="text-2xl font-bold text-white">VMS</h1>
-            <p className="text-sm text-zinc-400">Enterprise Visitor Management</p>
+            <p className="text-sm text-zinc-400">{t('topbar.subtitle')}</p>
           </div>
 
           <div className="flex items-center gap-4">
@@ -85,19 +62,7 @@ export function DashboardHeader() {
           </div>
         </div>
 
-        <nav className="flex items-center gap-2 -mx-6 px-6 pt-4 border-t border-white/10 flex-wrap">
-          {LINKS.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={`px-4 py-2 rounded-t-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/10 transition-colors ${
-                l.pushRight ? 'ml-auto' : ''
-              }`}
-            >
-              {t(l.key)}
-            </Link>
-          ))}
-        </nav>
+        <NavMenu />
       </div>
     </header>
   );

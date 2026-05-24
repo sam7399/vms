@@ -8,6 +8,7 @@ import { Search, ShieldX, ShieldCheck, Users, Download } from 'lucide-react';
 import { apiGet, apiPut } from '@/lib/api';
 import { downloadCSV } from '@/lib/csv';
 import { FaceEnrollButton } from '@/components/face-enroll-button';
+import { useI18n } from '@/lib/i18n';
 
 interface Visitor {
   id: string;
@@ -24,6 +25,7 @@ interface Visitor {
 
 export default function VisitorsListPage() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const [visitors, setVisitors] = useState<Visitor[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +96,7 @@ export default function VisitorsListPage() {
           <div>
             <div className="flex items-center gap-3">
               <Users className="w-7 h-7 text-blue-400" />
-              <h2 className="text-3xl font-bold text-white">Visitors</h2>
+              <h2 className="text-3xl font-bold text-white">{t('visitors.title')}</h2>
               {visitors && (
                 <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-300 text-sm">
                   {visitors.length}
@@ -102,7 +104,7 @@ export default function VisitorsListPage() {
               )}
             </div>
             <p className="text-zinc-400 mt-2">
-              Master visitor directory. Search, blacklist, audit visit history.
+              {t('visitors.subtitle')}
             </p>
           </div>
           {filtered.length > 0 && (

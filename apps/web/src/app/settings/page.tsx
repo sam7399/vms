@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { User, Building2, Lock, Server, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { apiGet, apiPut, API_URL } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 
 interface Me {
   id: string;
@@ -19,6 +20,7 @@ interface Me {
 
 export default function SettingsPage() {
   const { isAuthenticated, isLoading, logout } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
   const [meError, setMeError] = useState<string | null>(null);
@@ -81,8 +83,8 @@ export default function SettingsPage() {
 
       <div className="max-w-4xl mx-auto px-6 py-12 space-y-8">
         <div>
-          <h2 className="text-3xl font-bold text-white mb-2">Settings</h2>
-          <p className="text-zinc-400">Your profile and account security</p>
+          <h2 className="text-3xl font-bold text-white mb-2">{t('settings.title')}</h2>
+          <p className="text-zinc-400">{t('settings.subtitle')}</p>
         </div>
 
         {/* Profile card */}

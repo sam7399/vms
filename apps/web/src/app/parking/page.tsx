@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { ParkingCircle, Plus, Building2 } from 'lucide-react';
 import { apiGet, apiPost } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 
 interface Branch { id: string; name: string }
 interface Slot {
@@ -20,6 +21,7 @@ interface Slot {
 
 export default function ParkingPage() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -92,7 +94,7 @@ export default function ParkingPage() {
           <div>
             <div className="flex items-center gap-3">
               <ParkingCircle className="w-7 h-7 text-blue-400" />
-              <h2 className="text-3xl font-bold text-white">Parking</h2>
+              <h2 className="text-3xl font-bold text-white">{t('parking.title')}</h2>
               {slots && (
                 <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-300 text-sm">
                   {occupiedCount}/{totalCount} occupied
@@ -100,14 +102,14 @@ export default function ParkingPage() {
               )}
             </div>
             <p className="text-zinc-400 mt-2">
-              Parking slots per branch. Assign to visits via the visit page or from the gate.
+              {t('parking.subtitle')}
             </p>
           </div>
           <button
             onClick={() => setShowForm(!showForm)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium"
           >
-            <Plus className="w-4 h-4" /> New slot
+            <Plus className="w-4 h-4" /> {t('parking.new')}
           </button>
         </div>
 

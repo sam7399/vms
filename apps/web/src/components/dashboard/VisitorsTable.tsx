@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Clock, CheckCircle, XCircle, Hourglass, AlertCircle, LogIn, LogOut, Search } from "lucide-react";
 import { apiGet, apiPut } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
 type VisitStatus =
   | "PENDING"
@@ -33,7 +34,7 @@ function formatDate(iso: string | null | undefined) {
   });
 }
 
-function StatusBadge({ status }: { status: VisitStatus }) {
+function StatusBadge({ status, t }: { status: VisitStatus; t: (k: string) => string }) {
   const colorMap: Record<VisitStatus, string> = {
     APPROVED: "bg-green-500/10 text-green-400",
     PENDING: "bg-yellow-500/10 text-yellow-400",
@@ -46,7 +47,7 @@ function StatusBadge({ status }: { status: VisitStatus }) {
     <span
       className={`px-3 py-1 rounded-full text-xs font-medium ${colorMap[status]}`}
     >
-      {status.replace(/_/g, " ")}
+      {t(`status.${status}`)}
     </span>
   );
 }
@@ -67,6 +68,7 @@ function StatusIcon({ status }: { status: VisitStatus }) {
 }
 
 export function VisitorsTable({ branchId = "" }: { branchId?: string }) {
+  const { t } = useI18n();
   const [visits, setVisits] = useState<ApiVisit[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -119,7 +121,7 @@ export function VisitorsTable({ branchId = "" }: { branchId?: string }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden">
       <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between gap-3 flex-wrap">
-        <h3 className="text-lg font-semibold text-white">Recent Visits</h3>
+        <h3 className="text-lg font-semibold text-white">{t('dash.recentVisits')}</h3>
         <div className="flex items-center gap-3">
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -168,7 +170,7 @@ export function VisitorsTable({ branchId = "" }: { branchId?: string }) {
                   <h4 className="font-medium text-white truncate">
                     {visit.visitor.fullName}
                   </h4>
-                  <StatusBadge status={visit.status} />
+                  <StatusBadge status={visit.status} t={t} />
                 </div>
                 <p className="text-sm text-zinc-400">
                   Host: {visit.host.fullName}

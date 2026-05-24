@@ -5,6 +5,7 @@ import { Users, UserCheck, HardHat, Briefcase, Wifi, WifiOff } from "lucide-reac
 import { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { API_URL, apiGet } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
 interface HeadcountData {
   total: number;
@@ -17,6 +18,7 @@ interface HeadcountData {
 const EMPTY: HeadcountData = { total: 0, visitors: 0, workers: 0, employees: 0 };
 
 export function LiveHeadcountCard({ branchId = "" }: { branchId?: string }) {
+  const { t } = useI18n();
   const [data, setData] = useState<HeadcountData>(EMPTY);
   const [connected, setConnected] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -56,10 +58,10 @@ export function LiveHeadcountCard({ branchId = "" }: { branchId?: string }) {
   }, [branchId]);
 
   const cards = [
-    { label: "Total Inside", count: data.total, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
-    { label: "Visitors", count: data.visitors, icon: UserCheck, color: "text-purple-500", bg: "bg-purple-500/10" },
-    { label: "Contractors", count: data.workers, icon: HardHat, color: "text-orange-500", bg: "bg-orange-500/10" },
-    { label: "Employees", count: data.employees, icon: Briefcase, color: "text-green-500", bg: "bg-green-500/10" },
+    { label: t('dash.totalInside'), count: data.total, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { label: t('dash.visitorsInside'), count: data.visitors, icon: UserCheck, color: "text-purple-500", bg: "bg-purple-500/10" },
+    { label: t('dash.contractorsInside'), count: data.workers, icon: HardHat, color: "text-orange-500", bg: "bg-orange-500/10" },
+    { label: t('dash.employeesInside'), count: data.employees, icon: Briefcase, color: "text-green-500", bg: "bg-green-500/10" },
   ];
 
   if (!mounted) return null;
@@ -69,11 +71,11 @@ export function LiveHeadcountCard({ branchId = "" }: { branchId?: string }) {
       <div className="flex items-center gap-2 text-xs text-zinc-500 px-1">
         {connected ? (
           <>
-            <Wifi className="w-3 h-3 text-green-500" /> Live
+            <Wifi className="w-3 h-3 text-green-500" /> {t('dash.live')}
           </>
         ) : (
           <>
-            <WifiOff className="w-3 h-3 text-zinc-500" /> Connecting…
+            <WifiOff className="w-3 h-3 text-zinc-500" /> {t('dash.connecting')}
           </>
         )}
       </div>

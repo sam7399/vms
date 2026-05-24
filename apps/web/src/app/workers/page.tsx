@@ -8,6 +8,7 @@ import { Plus, ShieldCheck, ShieldOff, HardHat, LogIn, LogOut, Upload, QrCode } 
 import { QRCodeSVG } from 'qrcode.react';
 import { apiGet, apiPost } from '@/lib/api';
 import { FaceEnrollButton } from '@/components/face-enroll-button';
+import { useI18n } from '@/lib/i18n';
 
 export default function WorkersPage() {
   return (
@@ -44,6 +45,7 @@ interface Worker {
 
 function WorkersPageInner() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const search = useSearchParams();
   const contractorFilter = search.get('contractorId') || '';
@@ -192,11 +194,9 @@ function WorkersPageInner() {
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
           <div>
-            <h2 className="text-3xl font-bold text-white mb-2">Workers</h2>
+            <h2 className="text-3xl font-bold text-white mb-2">{t('workers.title')}</h2>
             <p className="text-zinc-400">
-              {contractorFilter
-                ? 'Showing workers for selected contractor'
-                : 'All registered workers across contractors'}
+              {contractorFilter ? t('workers.subtitleFiltered') : t('workers.subtitle')}
             </p>
           </div>
           <div className="flex gap-2">
@@ -211,7 +211,7 @@ function WorkersPageInner() {
               onClick={() => setShowForm(!showForm)}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors"
             >
-              <Plus className="w-4 h-4" /> Add Worker
+              <Plus className="w-4 h-4" /> {t('workers.add')}
             </button>
           </div>
         </div>

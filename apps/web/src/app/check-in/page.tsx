@@ -10,6 +10,7 @@ import { apiGet, apiPost } from '@/lib/api';
 import { WebcamCapture } from '@/components/webcam-capture';
 import { downloadBadgePDF } from '@/lib/badge';
 import { describeFace } from '@/lib/face-api-loader';
+import { useI18n } from '@/lib/i18n';
 
 interface Branch { id: string; name: string; location: string }
 interface Host { id: string; fullName: string; email: string; role: string; branchId: string }
@@ -27,6 +28,7 @@ interface VisitorResponse {
 
 export default function CheckInPage() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
 
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -176,10 +178,8 @@ export default function CheckInPage() {
 
       <div className="max-w-5xl mx-auto px-6 py-12">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-white mb-2">Pre-Register Visit</h2>
-          <p className="text-zinc-400">
-            Create a visitor + visit and get a QR token to share for gate check-in
-          </p>
+          <h2 className="text-3xl font-bold text-white mb-2">{t('checkin.title')}</h2>
+          <p className="text-zinc-400">{t('checkin.subtitle')}</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

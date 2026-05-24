@@ -7,6 +7,7 @@ import { DashboardHeader } from '@/components/dashboard-header';
 import { Plus, AlertTriangle, CheckCircle, Users } from 'lucide-react';
 import Link from 'next/link';
 import { apiGet, apiPost } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 
 interface Contractor {
   id: string;
@@ -18,6 +19,7 @@ interface Contractor {
 
 export default function ContractorsPage() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const [contractors, setContractors] = useState<Contractor[] | null>(null);
   const [error, setError] = useState('');
@@ -79,8 +81,8 @@ export default function ContractorsPage() {
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
           <div>
-            <h2 className="text-3xl font-bold text-white mb-2">Contractors</h2>
-            <p className="text-zinc-400">Manage and monitor contractor compliance</p>
+            <h2 className="text-3xl font-bold text-white mb-2">{t('contractors.title')}</h2>
+            <p className="text-zinc-400">{t('contractors.subtitle')}</p>
           </div>
           <div className="flex gap-3">
             <Link
@@ -93,7 +95,7 @@ export default function ContractorsPage() {
               onClick={() => setShowAddForm(!showAddForm)}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors"
             >
-              <Plus className="w-4 h-4" /> Add Contractor
+              <Plus className="w-4 h-4" /> {t('contractors.add')}
             </button>
           </div>
         </div>

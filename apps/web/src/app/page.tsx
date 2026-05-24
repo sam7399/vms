@@ -12,9 +12,11 @@ import { VisitsChart } from "@/components/dashboard/VisitsChart";
 import { VisitsHeatmap } from "@/components/dashboard/VisitsHeatmap";
 import { AnomaliesBanner } from "@/components/dashboard/AnomaliesBanner";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { useI18n } from "@/lib/i18n";
 
 export default function DashboardPage() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const [branchId, setBranchId] = useState("");
 
@@ -29,7 +31,7 @@ export default function DashboardPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-zinc-400">Loading...</p>
+          <p className="text-zinc-400">{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -45,7 +47,7 @@ export default function DashboardPage() {
 
       <div className="max-w-7xl mx-auto px-6">
         <div className="mt-8 flex items-center justify-between gap-4 flex-wrap">
-          <h2 className="text-xl font-semibold text-white">Live Occupancy</h2>
+          <h2 className="text-xl font-semibold text-white">{t('dash.liveOccupancy')}</h2>
           <BranchFilter value={branchId} onChange={setBranchId} />
         </div>
         <div className="mt-4">

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { DashboardHeader } from '@/components/dashboard-header';
+import { useI18n } from '@/lib/i18n';
 import {
   BookOpen,
   Users,
@@ -172,6 +173,7 @@ const SECTIONS: Section[] = [
 ];
 
 export default function HelpPage() {
+  const { t } = useI18n();
   return (
     <main className="min-h-screen">
       <DashboardHeader />
@@ -179,10 +181,10 @@ export default function HelpPage() {
         <div className="mb-8">
           <div className="flex items-center gap-3">
             <BookOpen className="w-7 h-7 text-blue-400" />
-            <h2 className="text-3xl font-bold text-white">How VMS works</h2>
+            <h2 className="text-3xl font-bold text-white">{t('help.title')}</h2>
           </div>
           <p className="text-zinc-400 mt-2">
-            A quick tour of every feature in the platform.
+            {t('help.subtitle')}
           </p>
         </div>
 

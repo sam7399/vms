@@ -7,6 +7,7 @@ import { DashboardHeader } from '@/components/dashboard-header';
 import { Package, Plus, ArrowDownLeft, ArrowUpRight, Search, Download } from 'lucide-react';
 import { apiGet, apiPost } from '@/lib/api';
 import { downloadCSV } from '@/lib/csv';
+import { useI18n } from '@/lib/i18n';
 
 interface Visit {
   id: string;
@@ -32,6 +33,7 @@ interface Pass {
 
 export default function MaterialPassPage() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const [passes, setPasses] = useState<Pass[] | null>(null);
   const [visits, setVisits] = useState<Visit[]>([]);
@@ -112,7 +114,7 @@ export default function MaterialPassPage() {
           <div>
             <div className="flex items-center gap-3">
               <Package className="w-7 h-7 text-blue-400" />
-              <h2 className="text-3xl font-bold text-white">Material gate pass</h2>
+              <h2 className="text-3xl font-bold text-white">{t('materials.title')}</h2>
               {passes && (
                 <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-300 text-sm">
                   {passes.length}

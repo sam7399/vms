@@ -7,6 +7,7 @@ import { DashboardHeader } from '@/components/dashboard-header';
 import { CheckCircle, XCircle, Hourglass, Building2, User, Car, CheckSquare, Square } from 'lucide-react';
 import { apiGet, apiPut } from '@/lib/api';
 import { VisitorAvatar } from '@/components/visitor-avatar';
+import { useI18n } from '@/lib/i18n';
 
 interface PendingVisit {
   id: string;
@@ -21,6 +22,7 @@ interface PendingVisit {
 
 export default function ApprovalsPage() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const [pending, setPending] = useState<PendingVisit[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +108,7 @@ export default function ApprovalsPage() {
         <div className="mb-8">
           <div className="flex items-center gap-3">
             <Hourglass className="w-7 h-7 text-yellow-400" />
-            <h2 className="text-3xl font-bold text-white">Pending Approvals</h2>
+            <h2 className="text-3xl font-bold text-white">{t('approvals.title')}</h2>
             {pending && (
               <span className="px-3 py-1 rounded-full bg-yellow-500/10 text-yellow-400 text-sm font-medium">
                 {pending.length}
@@ -114,7 +116,7 @@ export default function ApprovalsPage() {
             )}
           </div>
           <p className="text-zinc-400 mt-2">
-            Visits waiting on host approval. Auto-refreshes every 10 s.
+            {t('approvals.subtitle')}
           </p>
         </div>
 

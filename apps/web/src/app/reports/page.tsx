@@ -8,6 +8,7 @@ import { Download, FileSpreadsheet, FileText } from 'lucide-react';
 import { apiGet } from '@/lib/api';
 import { downloadCSV } from '@/lib/csv';
 import { downloadPDF } from '@/lib/pdf';
+import { useI18n } from '@/lib/i18n';
 
 type ReportKey = 'visits' | 'attendance' | 'compliance' | 'contractors' | 'workers' | 'workerHours';
 
@@ -127,6 +128,7 @@ const REPORTS: { key: ReportKey; label: string; description: string; endpoint: s
 
 export default function ReportsPage() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const [previews, setPreviews] = useState<Record<ReportKey, any[] | null>>({
     visits: null, attendance: null, compliance: null, contractors: null, workers: null, workerHours: null,
@@ -183,8 +185,8 @@ export default function ReportsPage() {
 
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-white mb-2">Reports</h2>
-          <p className="text-zinc-400">Pull live data from the API and download as CSV</p>
+          <h2 className="text-3xl font-bold text-white mb-2">{t('reports.title')}</h2>
+          <p className="text-zinc-400">{t('reports.subtitle')}</p>
         </div>
 
         {error && (

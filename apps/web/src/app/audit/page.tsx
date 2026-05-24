@@ -7,6 +7,7 @@ import { DashboardHeader } from '@/components/dashboard-header';
 import { Shield, AlertCircle, Download } from 'lucide-react';
 import { apiGet } from '@/lib/api';
 import { downloadCSV } from '@/lib/csv';
+import { useI18n } from '@/lib/i18n';
 
 interface AuditEntry {
   id: string;
@@ -44,6 +45,7 @@ function methodColor(m: string) {
 
 export default function AuditPage() {
   const { isAuthenticated, isLoading, user } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const [rows, setRows] = useState<AuditEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +96,7 @@ export default function AuditPage() {
           <div>
             <div className="flex items-center gap-3">
               <Shield className="w-7 h-7 text-blue-400" />
-              <h2 className="text-3xl font-bold text-white">Audit Log</h2>
+              <h2 className="text-3xl font-bold text-white">{t('audit.title')}</h2>
             </div>
             <p className="text-zinc-400 mt-2">
               Every write request to the API — actor, method, path, response status, duration.

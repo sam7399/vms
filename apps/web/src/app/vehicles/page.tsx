@@ -7,6 +7,7 @@ import { DashboardHeader } from '@/components/dashboard-header';
 import { Car, Download } from 'lucide-react';
 import { apiGet } from '@/lib/api';
 import { downloadCSV } from '@/lib/csv';
+import { useI18n } from '@/lib/i18n';
 
 interface VehicleRow {
   id: string;
@@ -36,6 +37,7 @@ function statusColor(s: string) {
 
 export default function VehiclesPage() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const [rows, setRows] = useState<VehicleRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +83,7 @@ export default function VehiclesPage() {
           <div>
             <div className="flex items-center gap-3">
               <Car className="w-7 h-7 text-blue-400" />
-              <h2 className="text-3xl font-bold text-white">Vehicle Entry Log</h2>
+              <h2 className="text-3xl font-bold text-white">{t('vehicles.title')}</h2>
             </div>
             <p className="text-zinc-400 mt-2">
               Vehicles attached to visits. {insideNow > 0 && `${insideNow} currently on premises.`}
