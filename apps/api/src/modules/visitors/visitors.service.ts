@@ -212,7 +212,7 @@ export class VisitorsService {
         .catch(() => {});
     }
 
-    // Real-time push to dashboards
+    // Real-time push to dashboards + mobile devices
     if (status === 'APPROVED' || status === 'REJECTED') {
       this.headcount.broadcastNotification({
         kind: 'approval',
@@ -220,9 +220,82 @@ export class VisitorsService {
         body: `Host: ${updated.host.fullName}`,
         visitId: updated.id,
       });
+      this.notifications
+        .pushToDevices({
+          title: `Visit ${status.toLowerCase()}`,
+          body: `${updated.visitor.fullName} · ${updated.host.fullName}`,
+          data: { visitId: updated.id, kind: 'approval' },
+          branchId: updated.branchId,
+        })
+        .catch(() => {});
     }
 
     return updated;
+  }
+
+  /**
+   * Currently-inside people for the user's org, with face photos as base64.
+   * Used by the mobile Face Verify screen to compare a captured face against
+   * everyone on-site right now.
+   */
+  async getActiveOnSite(user: JwtUser, branchId?: string) {
+    const orgFilter = visitScope(user);
+    const visitWhere: any = { status: VisitStatus.CHECKED_IN, actualExit: null, ...orgFilter };
+    if (branchId) visitWhere.branchId = branchId;
+
+    const visits = await prisma.visit.findMany({
+      where: visitWhere,
+      orderBy: { actualEntry: 'desc' },
+      take: 100,
+      include: {
+        visitor: {
+          select: { id: true, fullName: true, phone: true, company: true, faceData: true },
+        },
+        host: { select: { fullName: true } },
+        branch: { select: { name: true } },
+      },
+    });
+
+    const attendanceWhere: any = { checkOut: null };
+    if (!isSuperAdmin(user)) attendanceWhere.branch = { organizationId: (user as any).orgId };
+    if (branchId) attendanceWhere.branchId = branchId;
+    const workers = await prisma.attendance.findMany({
+      where: attendanceWhere,
+      orderBy: { checkIn: 'desc' },
+      take: 100,
+      include: {
+        worker: {
+          select: { id: true, fullName: true, phone: true, faceData: true, contractor: { select: { companyName: true } } },
+        },
+        branch: { select: { name: true } },
+      },
+    });
+
+    return {
+      visitors: visits.map((v) => ({
+        kind: 'visitor' as const,
+        visitId: v.id,
+        id: v.visitor.id,
+        name: v.visitor.fullName,
+        phone: v.visitor.phone,
+        company: v.visitor.company ?? undefined,
+        host: v.host?.fullName,
+        branch: v.branch?.name,
+        entryAt: v.actualEntry,
+        photo: v.visitor.faceData ? `data:image/jpeg;base64,${Buffer.from(v.visitor.faceData as Uint8Array).toString('base64')}` : null,
+      })),
+      workers: workers.map((a) => ({
+        kind: 'worker' as const,
+        attendanceId: a.id,
+        id: a.worker.id,
+        name: a.worker.fullName,
+        phone: a.worker.phone,
+        company: a.worker.contractor?.companyName,
+        branch: a.branch?.name,
+        entryAt: a.checkIn,
+        photo: a.worker.faceData ? `data:image/jpeg;base64,${Buffer.from(a.worker.faceData as Uint8Array).toString('base64')}` : null,
+      })),
+    };
   }
 
   async checkInVisitor(user: JwtUser, visitId: string) {

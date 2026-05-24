@@ -6,10 +6,12 @@ import { DashboardHeader } from '@/components/dashboard-header';
 import { Logo } from '@/components/logo';
 import { CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
 import { API_URL } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 
 type Health = 'unknown' | 'ok' | 'down';
 
 export default function AboutPage() {
+  const { t } = useI18n();
   const [api, setApi] = useState<Health>('unknown');
   const [latency, setLatency] = useState<number | null>(null);
 
@@ -37,7 +39,7 @@ export default function AboutPage() {
           </div>
         </div>
 
-        <Section title="System status">
+        <Section title={t('about.apiStatus')}>
           <StatusRow
             label="API"
             href={API_URL}
@@ -70,7 +72,7 @@ export default function AboutPage() {
           </p>
         </Section>
 
-        <Section title="Stack">
+        <Section title={t('about.stack')}>
           <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-zinc-300">
             <Item label="Web" value="Next.js 14 · Tailwind · Framer Motion" />
             <Item label="Mobile" value="Expo SDK 54 · React Native" />
@@ -83,7 +85,7 @@ export default function AboutPage() {
           </ul>
         </Section>
 
-        <Section title="Quick links">
+        <Section title={t('about.quickLinks')}>
           <div className="flex flex-wrap gap-2">
             <PillLink href={`${API_URL}/docs`}>API docs (Swagger)</PillLink>
             <PillLink href="/help">In-app help</PillLink>

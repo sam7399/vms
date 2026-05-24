@@ -7,8 +7,10 @@ import { ApprovalsScreen } from "./screens/ApprovalsScreen";
 import { WorkersScreen } from "./screens/WorkersScreen";
 import { DashboardScreen } from "./screens/DashboardScreen";
 import { InviteScreen } from "./screens/InviteScreen";
+import { FaceVerifyScreen } from "./screens/FaceVerifyScreen";
 import { clearSession, getUser, SessionUser } from "./api";
 import { I18nProvider, useI18n } from "./i18n";
+import { registerForPushNotifications } from "./push";
 
 const WORKER_ROLES = new Set([
   "SUPER_ADMIN",
@@ -32,7 +34,7 @@ type AuthState =
   | { kind: "gate" }
   | { kind: "authed"; user: SessionUser };
 
-type Tab = "dashboard" | "checkin" | "approvals" | "workers" | "invite";
+type Tab = "dashboard" | "checkin" | "face" | "approvals" | "workers" | "invite";
 
 export default function App() {
   return (
@@ -49,7 +51,14 @@ function AppInner() {
 
   useEffect(() => {
     getUser()
-      .then((u) => setAuth(u ? { kind: "authed", user: u } : { kind: "anonymous" }))
+      .then((u) => {
+        if (u) {
+          setAuth({ kind: "authed", user: u });
+          registerForPushNotifications().catch(() => {});
+        } else {
+          setAuth({ kind: "anonymous" });
+        }
+      })
       .catch(() => setAuth({ kind: "anonymous" }));
   }, []);
 
@@ -70,6 +79,7 @@ function AppInner() {
           onLoggedIn={(user) => {
             setAuth({ kind: "authed", user });
             setTab("dashboard");
+            registerForPushNotifications().catch(() => {});
           }}
           onContinueAsGate={() => {
             setAuth({ kind: "gate" });
@@ -109,6 +119,7 @@ function AppInner() {
         <View style={styles.screenWrap}>
           {tab === "dashboard" && <DashboardScreen user={auth.user} />}
           {tab === "checkin" && <CheckInScreen />}
+          {tab === "face" && <FaceVerifyScreen />}
           {tab === "approvals" && <ApprovalsScreen user={auth.user} />}
           {tab === "workers" && showWorkers && <WorkersScreen user={auth.user} />}
           {tab === "invite" && showInvite && <InviteScreen user={auth.user} />}
@@ -122,6 +133,7 @@ function AppInner() {
         >
           <TabButton label={t("tab.dashboard")} active={tab === "dashboard"} onPress={() => setTab("dashboard")} />
           <TabButton label={t("tab.checkIn")} active={tab === "checkin"} onPress={() => setTab("checkin")} />
+          <TabButton label={t("tab.face")} active={tab === "face"} onPress={() => setTab("face")} />
           <TabButton label={t("tab.approvals")} active={tab === "approvals"} onPress={() => setTab("approvals")} />
           {showWorkers && (
             <TabButton label={t("tab.workers")} active={tab === "workers"} onPress={() => setTab("workers")} />

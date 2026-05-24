@@ -170,6 +170,16 @@ export class PublicService {
       visitId: visit.id,
     });
 
+    // Expo push to every device in the branch (host's mobile phone)
+    this.notifications
+      .pushToDevices({
+        title: 'New walk-in at the gate',
+        body: `${visit.visitor.fullName} → ${visit.host.fullName} · ${data.purpose}`,
+        data: { visitId: visit.id, kind: 'walk-in' },
+        branchId: data.branchId,
+      })
+      .catch(() => {});
+
     // Free Telegram channel (no-op without TELEGRAM_BOT_TOKEN)
     this.notifications
       .telegram(

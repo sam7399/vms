@@ -29,8 +29,18 @@
         {
           "cameraPermission": "VMS uses the camera to scan QR codes and capture visitor photos at the gate."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#7c3aed"
+        }
       ]
     ],
+    "notification": {
+      "iosDisplayInForeground": true,
+      "color": "#7c3aed"
+    },
     "extra": {
       "apiUrl": "https://vms-api-gxep.onrender.com",
       "eas": {

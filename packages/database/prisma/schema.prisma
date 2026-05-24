@@ -275,6 +275,21 @@ model Attendance {
   @@index([checkIn])
 }
 
+model DeviceToken {
+  id        String   @id @default(uuid())
+  userId    String?  @db.VarChar(100)   // null = anon kiosk
+  token     String   @unique @db.VarChar(255)  // Expo push token
+  platform  String   @db.VarChar(20)    // "ios" | "android" | "web"
+  branchId  String?  @db.VarChar(100)   // for fanout filtering
+  orgId     String?  @db.VarChar(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([branchId])
+  @@index([orgId])
+}
+
 model AuditLog {
   id         String   @id @default(uuid())
   actorId    String?  @db.VarChar(100)   // userId from JWT, or null for anon

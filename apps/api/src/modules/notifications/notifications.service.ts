@@ -1,9 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 interface SendArgs {
   to: string;
   subject: string;
   html: string;
+}
+
+interface PushArgs {
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+  /** Filter recipients. Empty = every registered device. */
+  branchId?: string;
+  orgId?: string;
+  userId?: string;
 }
 
 /**
@@ -81,6 +94,92 @@ export class NotificationsService {
       this.log.warn(`Resend send failed: ${e?.message ?? e}`);
       return { sent: false, reason: e?.message ?? 'network error' };
     }
+  }
+
+  /** Persist or refresh a device's Expo push token. */
+  async registerDeviceToken(args: {
+    token: string;
+    platform: string;
+    userId?: string | null;
+    branchId?: string | null;
+    orgId?: string | null;
+  }) {
+    if (!args.token || !args.token.startsWith('ExponentPushToken')) {
+      return { ok: false, reason: 'Invalid Expo push token' };
+    }
+    await prisma.deviceToken.upsert({
+      where: { token: args.token },
+      update: {
+        platform: args.platform.slice(0, 20),
+        userId: args.userId ?? null,
+        branchId: args.branchId ?? null,
+        orgId: args.orgId ?? null,
+      },
+      create: {
+        token: args.token,
+        platform: args.platform.slice(0, 20),
+        userId: args.userId ?? null,
+        branchId: args.branchId ?? null,
+        orgId: args.orgId ?? null,
+      },
+    });
+    return { ok: true };
+  }
+
+  async unregisterDeviceToken(token: string) {
+    if (!token) return { ok: false };
+    await prisma.deviceToken.deleteMany({ where: { token } });
+    return { ok: true };
+  }
+
+  /**
+   * Fan-out to every device matching the filter via Expo's HTTPS push
+   * endpoint. Free — no API key required. No-ops if there are no recipients.
+   */
+  async pushToDevices(args: PushArgs): Promise<{ sent: number; failed: number }> {
+    const where: any = {};
+    if (args.userId) where.userId = args.userId;
+    if (args.branchId) where.branchId = args.branchId;
+    if (args.orgId) where.orgId = args.orgId;
+
+    const tokens = await prisma.deviceToken.findMany({ where, select: { token: true } });
+    if (tokens.length === 0) return { sent: 0, failed: 0 };
+
+    const messages = tokens.map((t) => ({
+      to: t.token,
+      sound: 'default' as const,
+      title: args.title,
+      body: args.body,
+      data: args.data ?? {},
+    }));
+
+    // Expo accepts batches up to 100 per call
+    let sent = 0;
+    let failed = 0;
+    for (let i = 0; i < messages.length; i += 100) {
+      const batch = messages.slice(i, i + 100);
+      try {
+        const res = await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Accept-Encoding': 'gzip, deflate',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(batch),
+        });
+        if (!res.ok) {
+          this.log.warn(`Expo push ${res.status}: ${await res.text().catch(() => '')}`);
+          failed += batch.length;
+          continue;
+        }
+        sent += batch.length;
+      } catch (e: any) {
+        this.log.warn(`Expo push failed: ${e?.message ?? e}`);
+        failed += batch.length;
+      }
+    }
+    return { sent, failed };
   }
 
   async sendVisitorPassApproved(args: {

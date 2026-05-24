@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { UserPlus, ShieldCheck, ShieldOff, Building2, Users as UsersIcon } from 'lucide-react';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 
 interface Branch { id: string; name: string }
 interface User {
@@ -33,6 +34,7 @@ const ROLES = [
 export default function AdminUsersPage() {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const { t } = useI18n();
   const [users, setUsers] = useState<User[] | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -111,22 +113,20 @@ export default function AdminUsersPage() {
           <div>
             <div className="flex items-center gap-3">
               <UsersIcon className="w-7 h-7 text-brand-400" />
-              <h2 className="text-3xl font-bold text-white">Users</h2>
+              <h2 className="text-3xl font-bold text-white">{t('adminUsers.title')}</h2>
               {users && (
                 <span className="px-3 py-1 rounded-full bg-brand-500/10 text-brand-300 text-sm">
                   {users.length}
                 </span>
               )}
             </div>
-            <p className="text-zinc-400 mt-2">
-              Manage who can log in. Roles control which pages and writes they can use.
-            </p>
+            <p className="text-zinc-400 mt-2">{t('adminUsers.subtitle')}</p>
           </div>
           <button
             onClick={() => setShowForm(!showForm)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-medium"
           >
-            <UserPlus className="w-4 h-4" /> Add user
+            <UserPlus className="w-4 h-4" /> {t('adminUsers.add')}
           </button>
         </div>
 
@@ -143,7 +143,7 @@ export default function AdminUsersPage() {
           >
             <input
               required
-              placeholder="Full name"
+              placeholder={t('adminUsers.fullName')}
               value={form.fullName}
               onChange={(e) => setForm({ ...form, fullName: e.target.value })}
               className="px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500"
@@ -151,7 +151,7 @@ export default function AdminUsersPage() {
             <input
               required
               type="email"
-              placeholder="Email"
+              placeholder={t('common.email')}
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               className="px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500"
@@ -171,7 +171,7 @@ export default function AdminUsersPage() {
               onChange={(e) => setForm({ ...form, branchId: e.target.value })}
               className="px-4 py-2 rounded-lg bg-slate-900 border border-white/20 text-white"
             >
-              <option value="">— Branch —</option>
+              <option value="">— {t('common.branch')} —</option>
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
@@ -191,34 +191,34 @@ export default function AdminUsersPage() {
                 disabled={busy}
                 className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium disabled:opacity-50"
               >
-                {busy ? 'Creating…' : 'Create user'}
+                {busy ? t('common.loading') : t('adminUsers.add')}
               </button>
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
                 className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm"
               >
-                Cancel
+                {t('action.cancel')}
               </button>
             </div>
           </form>
         )}
 
         <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden">
-          {!users && <div className="p-6 text-zinc-500">Loading…</div>}
+          {!users && <div className="p-6 text-zinc-500">{t('common.loading')}</div>}
           {users && users.length === 0 && (
-            <div className="p-8 text-center text-zinc-500 text-sm">No users yet.</div>
+            <div className="p-8 text-center text-zinc-500 text-sm">{t('adminUsers.empty')}</div>
           )}
           {users && users.length > 0 && (
             <table className="w-full text-sm">
               <thead className="text-xs text-zinc-400 uppercase border-b border-white/10">
                 <tr>
-                  <th className="text-left p-4">Name</th>
-                  <th className="text-left p-4">Email</th>
-                  <th className="text-left p-4">Role</th>
-                  <th className="text-left p-4">Branch</th>
-                  <th className="text-left p-4">2FA</th>
-                  <th className="text-left p-4">Status</th>
+                  <th className="text-left p-4">{t('common.name')}</th>
+                  <th className="text-left p-4">{t('common.email')}</th>
+                  <th className="text-left p-4">{t('adminUsers.role')}</th>
+                  <th className="text-left p-4">{t('adminUsers.branch')}</th>
+                  <th className="text-left p-4">{t('adminUsers.twoFA')}</th>
+                  <th className="text-left p-4">{t('common.status')}</th>
                   <th className="text-left p-4"></th>
                 </tr>
               </thead>
@@ -243,11 +243,11 @@ export default function AdminUsersPage() {
                     <td className="p-4">
                       {u.isActive ? (
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-500/10 text-green-300 text-xs">
-                          <ShieldCheck className="w-3 h-3" /> Active
+                          <ShieldCheck className="w-3 h-3" /> {t('common.active')}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-zinc-500/15 text-zinc-400 text-xs">
-                          <ShieldOff className="w-3 h-3" /> Inactive
+                          <ShieldOff className="w-3 h-3" /> {t('common.inactive')}
                         </span>
                       )}
                     </td>
@@ -260,7 +260,7 @@ export default function AdminUsersPage() {
                             : 'bg-green-500/15 hover:bg-green-500/25 text-green-300'
                         }`}
                       >
-                        {u.isActive ? 'Deactivate' : 'Activate'}
+                        {u.isActive ? t('adminUsers.deactivate') : t('adminUsers.activate')}
                       </button>
                     </td>
                   </tr>

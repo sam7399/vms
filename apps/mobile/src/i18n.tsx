@@ -9,6 +9,7 @@ const EN: Record<string, string> = {
   "tab.approvals": "Approvals",
   "tab.workers": "Workers",
   "tab.invite": "Invite",
+  "tab.face": "Verify",
   "tab.signOut": "Sign out",
   "auth.signIn": "Sign in",
   "auth.email": "Email",
@@ -37,6 +38,16 @@ const EN: Record<string, string> = {
   "invite.submit": "Generate pass",
   "dash.totalInside": "Total inside",
   "dash.pendingApprovals": "Pending",
+  "common.clear": "Clear",
+  "face.title": "Face verify",
+  "face.hint": "Capture a face, then match it visually against everyone currently on-site.",
+  "face.capture": "Capture",
+  "face.retake": "Retake",
+  "face.enableCamera": "Enable camera",
+  "face.searchPlaceholder": "Search by name, phone, company",
+  "face.onSite": "On-site now",
+  "face.noneOnSite": "No one is currently inside.",
+  "face.host": "Host",
 };
 
 const HI: Record<string, string> = {
@@ -45,6 +56,7 @@ const HI: Record<string, string> = {
   "tab.approvals": "अनुमोदन",
   "tab.workers": "कर्मचारी",
   "tab.invite": "आमंत्रित",
+  "tab.face": "सत्यापन",
   "tab.signOut": "साइन आउट",
   "auth.signIn": "साइन इन",
   "auth.email": "ईमेल",
@@ -73,6 +85,16 @@ const HI: Record<string, string> = {
   "invite.submit": "पास बनाएँ",
   "dash.totalInside": "अंदर कुल",
   "dash.pendingApprovals": "लंबित",
+  "common.clear": "साफ़",
+  "face.title": "चेहरा सत्यापन",
+  "face.hint": "एक तस्वीर लें, फिर परिसर में मौजूद सभी से नज़र से मिलान करें।",
+  "face.capture": "तस्वीर लें",
+  "face.retake": "फिर लें",
+  "face.enableCamera": "कैमरा सक्षम करें",
+  "face.searchPlaceholder": "नाम, फ़ोन, कंपनी खोजें",
+  "face.onSite": "अभी अंदर",
+  "face.noneOnSite": "अभी कोई अंदर नहीं है।",
+  "face.host": "होस्ट",
 };
 
 const DICT: Record<Lang, Record<string, string>> = { en: EN, hi: HI };

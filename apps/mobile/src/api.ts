@@ -135,4 +135,44 @@ export const api = {
   // SOS — broadcasts to every connected dashboard
   sosTrigger: (message?: string) =>
     request<{ ok: boolean }>("/sos/trigger", { method: "POST", body: { message } }),
+
+  // Active visitors+workers on-site (with photos, for face verify gallery)
+  activeOnSite: () =>
+    request<{
+      visitors: Array<{
+        kind: "visitor";
+        visitId: string;
+        id: string;
+        name: string;
+        phone: string;
+        company?: string;
+        host?: string;
+        branch?: string;
+        entryAt: string;
+        photo: string | null;
+      }>;
+      workers: Array<{
+        kind: "worker";
+        attendanceId: string;
+        id: string;
+        name: string;
+        phone: string;
+        company?: string;
+        branch?: string;
+        entryAt: string;
+        photo: string | null;
+      }>;
+    }>("/visitors/active"),
+
+  // Push notification token
+  registerPushToken: (token: string, platform: string) =>
+    request<{ ok: boolean }>("/notifications/register", {
+      method: "POST",
+      body: { token, platform },
+    }),
+  unregisterPushToken: (token: string) =>
+    request<{ ok: boolean }>("/notifications/unregister", {
+      method: "POST",
+      body: { token },
+    }),
 };

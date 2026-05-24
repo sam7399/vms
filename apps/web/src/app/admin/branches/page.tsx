@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Building2, Plus } from 'lucide-react';
 import { apiGet, apiPost } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 
 interface Branch {
   id: string;
@@ -17,6 +18,7 @@ interface Branch {
 export default function AdminBranchesPage() {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const { t } = useI18n();
   const [branches, setBranches] = useState<Branch[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -70,22 +72,20 @@ export default function AdminBranchesPage() {
           <div>
             <div className="flex items-center gap-3">
               <Building2 className="w-7 h-7 text-brand-400" />
-              <h2 className="text-3xl font-bold text-white">Branches</h2>
+              <h2 className="text-3xl font-bold text-white">{t('adminBranches.title')}</h2>
               {branches && (
                 <span className="px-3 py-1 rounded-full bg-brand-500/10 text-brand-300 text-sm">
                   {branches.length}
                 </span>
               )}
             </div>
-            <p className="text-zinc-400 mt-2">
-              Physical sites where visits, attendance, and parking are tracked.
-            </p>
+            <p className="text-zinc-400 mt-2">{t('adminBranches.subtitle')}</p>
           </div>
           <button
             onClick={() => setShowForm(!showForm)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-medium"
           >
-            <Plus className="w-4 h-4" /> New branch
+            <Plus className="w-4 h-4" /> {t('adminBranches.new')}
           </button>
         </div>
 
@@ -102,14 +102,14 @@ export default function AdminBranchesPage() {
           >
             <input
               required
-              placeholder="Name (e.g. HQ, Plant 1)"
+              placeholder={`${t('common.name')} (e.g. HQ, Plant 1)`}
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500"
             />
             <input
               required
-              placeholder="Location (street / city)"
+              placeholder={t('adminBranches.location')}
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
               className="px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500"
@@ -120,24 +120,24 @@ export default function AdminBranchesPage() {
                 disabled={busy}
                 className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium disabled:opacity-50"
               >
-                {busy ? 'Saving…' : 'Save branch'}
+                {busy ? t('common.loading') : t('action.save')}
               </button>
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
                 className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm"
               >
-                Cancel
+                {t('action.cancel')}
               </button>
             </div>
           </form>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {!branches && <p className="text-zinc-500">Loading…</p>}
+          {!branches && <p className="text-zinc-500">{t('common.loading')}</p>}
           {branches && branches.length === 0 && (
             <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-zinc-500 text-sm md:col-span-2">
-              No branches yet.
+              {t('adminBranches.empty')}
             </div>
           )}
           {branches?.map((b) => (
