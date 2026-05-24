@@ -111,23 +111,40 @@ model ParkingSlot {
 }
 
 model User {
-  id           String    @id @default(uuid())
-  branchId     String
-  email        String    @unique @db.VarChar(255)
-  passwordHash String
-  fullName     String    @db.VarChar(255)
-  role         Role
-  phone        String?   @db.VarChar(20)
-  faceData     Bytes?    // Face embedding vector for facial recognition
-  isActive     Boolean   @default(true)
-  branch       Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  visitsHosted Visit[]   @relation("HostToVisit")
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id            String    @id @default(uuid())
+  branchId      String
+  email         String    @unique @db.VarChar(255)
+  passwordHash  String
+  fullName      String    @db.VarChar(255)
+  role          Role
+  phone         String?   @db.VarChar(20)
+  faceData      Bytes?
+  isActive      Boolean   @default(true)
+  totpSecret    String?   @db.VarChar(255)
+  totpEnabled   Boolean   @default(false)
+  branch        Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  visitsHosted  Visit[]   @relation("HostToVisit")
+  resetTokens   PasswordResetToken[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([branchId])
   @@index([email])
   @@index([role])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique @db.VarChar(128)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
 }
 
 model Visitor {

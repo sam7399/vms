@@ -18,20 +18,35 @@ export function WebcamCapture({ onCapture, initialDataUrl }: Props) {
   async function startCamera() {
     setError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 480 }, height: { ideal: 480 }, facingMode: 'user' },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+      // Try preferred constraints, fall back if device can't honour them
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 480 }, height: { ideal: 480 }, facingMode: 'user' },
+          audio: false,
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       }
+      streamRef.current = stream;
       setActive(true);
+      // Wait one tick so the <video> ref exists, then attach
+      requestAnimationFrame(async () => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          try {
+            await videoRef.current.play();
+          } catch {
+            // autoplay attribute on the element will pick it up
+          }
+        }
+      });
     } catch (e: any) {
       setError(
         e?.name === 'NotAllowedError'
           ? 'Camera permission denied. Allow access in your browser settings.'
+          : e?.name === 'NotFoundError'
+          ? 'No camera found on this device.'
           : e?.message || 'Could not access the camera',
       );
     }
@@ -75,7 +90,14 @@ export function WebcamCapture({ onCapture, initialDataUrl }: Props) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={photo} alt="Captured" className="w-full h-full object-cover" />
         ) : active ? (
-          <video ref={videoRef} muted playsInline className="w-full h-full object-cover" />
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            disablePictureInPicture
+            className="w-full h-full object-cover bg-black"
+          />
         ) : (
           <div className="text-center text-zinc-500 p-6">
             <Camera className="w-12 h-12 mx-auto mb-2 opacity-50" />

@@ -38,22 +38,31 @@ export function FaceEnrollButton({ kind, id, label, onEnrolled }: Props) {
     setState({ kind: 'loading' });
     try {
       await loadFaceApi();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } },
+          audio: false,
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       }
+      streamRef.current = stream;
       setState({ kind: 'ready' });
+      requestAnimationFrame(async () => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          try { await videoRef.current.play(); } catch {}
+        }
+      });
     } catch (e: any) {
       setState({
         kind: 'error',
         message:
           e?.name === 'NotAllowedError'
             ? 'Camera permission denied.'
+            : e?.name === 'NotFoundError'
+            ? 'No camera found on this device.'
             : e?.message || 'Could not start camera',
       });
     }
@@ -126,7 +135,14 @@ export function FaceEnrollButton({ kind, id, label, onEnrolled }: Props) {
           {state.kind === 'loading' ? (
             <p className="text-xs text-zinc-400">Loading face models…</p>
           ) : (
-            <video ref={videoRef} muted playsInline className="w-full h-full object-cover" />
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              disablePictureInPicture
+              className="w-full h-full object-cover bg-black"
+            />
           )}
         </div>
 

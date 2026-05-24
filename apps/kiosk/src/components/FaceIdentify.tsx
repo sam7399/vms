@@ -53,21 +53,30 @@ export function FaceIdentify() {
 
   async function startCamera() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false,
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       }
+      streamRef.current = stream;
+      requestAnimationFrame(async () => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          try { await videoRef.current.play(); } catch {}
+        }
+      });
     } catch (e: any) {
       setState({
         kind: "error",
         message:
           e?.name === "NotAllowedError"
             ? "Camera permission denied."
+            : e?.name === "NotFoundError"
+            ? "No camera found."
             : e?.message || "Could not start camera",
       });
     }
@@ -176,7 +185,14 @@ export function FaceIdentify() {
         state.kind === "no-match") && (
         <>
           <div className="rounded-xl overflow-hidden bg-black aspect-video">
-            <video ref={videoRef} muted playsInline className="w-full h-full object-cover" />
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              disablePictureInPicture
+              className="w-full h-full object-cover bg-black"
+            />
           </div>
           {buttonRow}
           {state.kind === "match" && (

@@ -19,15 +19,11 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
-  async login(@Body() body: { email: string; password: string }) {
+  async login(@Body() body: { email: string; password: string; totp?: string }) {
     if (!body?.email || !body?.password) {
       throw new BadRequestException('email and password are required');
     }
-    const user = await this.authService.validateUser(body.email, body.password);
-    if (!user) {
-      throw new UnauthorizedException('Invalid email or password');
-    }
-    return this.authService.login(user);
+    return this.authService.loginWithOptionalTotp(body.email, body.password, body.totp);
   }
 
   @Post('register')
@@ -90,5 +86,48 @@ export class AuthController {
       }
       throw new BadRequestException(e?.message ?? 'Could not change password');
     }
+  }
+
+  // --- 2FA ----------------------------------------------------------------
+  @Post('2fa/setup')
+  @UseGuards(JwtAuthGuard)
+  setup2fa(@CurrentUser() user: any) {
+    return this.authService.totpSetup(user.userId);
+  }
+
+  @Post('2fa/enable')
+  @UseGuards(JwtAuthGuard)
+  enable2fa(@CurrentUser() user: any, @Body() body: { totp: string }) {
+    if (!body?.totp) throw new BadRequestException('totp is required');
+    return this.authService.totpEnable(user.userId, body.totp);
+  }
+
+  @Post('2fa/disable')
+  @UseGuards(JwtAuthGuard)
+  disable2fa(
+    @CurrentUser() user: any,
+    @Body() body: { currentPassword: string; totp: string },
+  ) {
+    if (!body?.currentPassword || !body?.totp) {
+      throw new BadRequestException('currentPassword and totp are required');
+    }
+    return this.authService.totpDisable(user.userId, body.currentPassword, body.totp);
+  }
+
+  // --- Password reset -----------------------------------------------------
+  @Post('forgot-password')
+  @HttpCode(200)
+  async forgot(@Body() body: { email: string }) {
+    if (!body?.email) throw new BadRequestException('email required');
+    return this.authService.createResetToken(body.email);
+  }
+
+  @Post('reset-password')
+  @HttpCode(200)
+  async reset(@Body() body: { token: string; newPassword: string }) {
+    if (!body?.token || !body?.newPassword) {
+      throw new BadRequestException('token and newPassword required');
+    }
+    return this.authService.resetPasswordWithToken(body.token, body.newPassword);
   }
 }

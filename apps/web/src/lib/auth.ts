@@ -49,8 +49,16 @@ export function clearAuth(): void {
 
 import { apiPost } from './api';
 
-export async function apiLogin(email: string, password: string): Promise<AuthResponse> {
-  return apiPost<AuthResponse>('/auth/login', { email, password });
+export type LoginResult =
+  | AuthResponse
+  | { totpRequired: true };
+
+export async function apiLogin(
+  email: string,
+  password: string,
+  totp?: string,
+): Promise<LoginResult> {
+  return apiPost<LoginResult>('/auth/login', { email, password, totp });
 }
 
 export async function apiSignup(

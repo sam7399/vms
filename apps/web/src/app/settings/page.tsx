@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
-import { User, Building2, Lock, Server, ShieldCheck, CheckCircle2 } from 'lucide-react';
-import { apiGet, apiPut, API_URL } from '@/lib/api';
+import { User, Building2, Lock, Server, ShieldCheck, CheckCircle2, Smartphone } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { apiGet, apiPost, apiPut, API_URL } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 
 interface Me {
@@ -15,6 +16,7 @@ interface Me {
   role: string;
   branchId: string;
   branch: { id: string; name: string; location: string };
+  totpEnabled: boolean;
   createdAt: string;
 }
 
@@ -31,6 +33,14 @@ export default function SettingsPage() {
   const [pwBusy, setPwBusy] = useState(false);
   const [pwError, setPwError] = useState<string | null>(null);
   const [pwOk, setPwOk] = useState(false);
+
+  // 2FA state
+  const [totp, setTotp] = useState<null | { secret: string; otpauthUrl: string }>(null);
+  const [totpCode, setTotpCode] = useState('');
+  const [totpBusy, setTotpBusy] = useState(false);
+  const [totpError, setTotpError] = useState<string | null>(null);
+  const [disablePw, setDisablePw] = useState('');
+  const [disableCode, setDisableCode] = useState('');
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) router.push('/auth/login');
@@ -66,6 +76,58 @@ export default function SettingsPage() {
       setPwError(e instanceof Error ? e.message : 'Change failed');
     } finally {
       setPwBusy(false);
+    }
+  }
+
+  async function setupTotp() {
+    setTotpError(null);
+    setTotpBusy(true);
+    try {
+      const r = await apiPost<{ secret: string; otpauthUrl: string }>(
+        '/auth/2fa/setup',
+        {},
+      );
+      setTotp(r);
+    } catch (e) {
+      setTotpError(e instanceof Error ? e.message : 'Setup failed');
+    } finally {
+      setTotpBusy(false);
+    }
+  }
+
+  async function enableTotp(e: React.FormEvent) {
+    e.preventDefault();
+    setTotpError(null);
+    setTotpBusy(true);
+    try {
+      await apiPost('/auth/2fa/enable', { totp: totpCode });
+      setTotp(null);
+      setTotpCode('');
+      // reload profile so the UI flips to "enabled"
+      apiGet<Me>('/auth/me').then(setMe).catch(() => {});
+    } catch (e) {
+      setTotpError(e instanceof Error ? e.message : 'Verification failed');
+    } finally {
+      setTotpBusy(false);
+    }
+  }
+
+  async function disableTotp(e: React.FormEvent) {
+    e.preventDefault();
+    setTotpError(null);
+    setTotpBusy(true);
+    try {
+      await apiPost('/auth/2fa/disable', {
+        currentPassword: disablePw,
+        totp: disableCode,
+      });
+      setDisablePw('');
+      setDisableCode('');
+      apiGet<Me>('/auth/me').then(setMe).catch(() => {});
+    } catch (e) {
+      setTotpError(e instanceof Error ? e.message : 'Disable failed');
+    } finally {
+      setTotpBusy(false);
     }
   }
 
@@ -188,6 +250,107 @@ export default function SettingsPage() {
               </button>
             </div>
           </form>
+        </div>
+
+        {/* 2FA */}
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
+          <div className="flex items-center gap-3 mb-4">
+            <Smartphone className="w-5 h-5 text-brand-400" />
+            <h3 className="text-lg font-semibold text-white">
+              Two-factor authentication
+            </h3>
+            {me?.totpEnabled && (
+              <span className="ml-auto px-2 py-0.5 rounded-full bg-green-500/15 text-green-300 text-xs font-medium">
+                Enabled
+              </span>
+            )}
+          </div>
+
+          {totpError && (
+            <p className="mb-3 text-sm text-red-300">{totpError}</p>
+          )}
+
+          {!me?.totpEnabled && !totp && (
+            <div className="space-y-3">
+              <p className="text-sm text-zinc-400">
+                Add a 6-digit code from Google Authenticator / Authy on every sign-in.
+              </p>
+              <button
+                onClick={setupTotp}
+                disabled={totpBusy}
+                className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium disabled:opacity-50"
+              >
+                {totpBusy ? 'Generating…' : 'Set up 2FA'}
+              </button>
+            </div>
+          )}
+
+          {!me?.totpEnabled && totp && (
+            <form onSubmit={enableTotp} className="space-y-4">
+              <p className="text-sm text-zinc-300">
+                1. Scan this QR with your authenticator app:
+              </p>
+              <div className="bg-white rounded-xl p-4 inline-block">
+                <QRCodeSVG value={totp.otpauthUrl} size={180} level="M" includeMargin />
+              </div>
+              <p className="text-xs text-zinc-500 font-mono break-all">
+                Or enter manually: <span className="text-zinc-300">{totp.secret}</span>
+              </p>
+              <p className="text-sm text-zinc-300">2. Enter the 6-digit code to confirm:</p>
+              <input
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                maxLength={6}
+                className="w-40 px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-center font-mono text-lg tracking-widest focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={totpBusy || totpCode.length !== 6}
+                  className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium disabled:opacity-50"
+                >
+                  {totpBusy ? 'Verifying…' : 'Enable 2FA'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setTotp(null); setTotpCode(''); setTotpError(null); }}
+                  className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+
+          {me?.totpEnabled && (
+            <form onSubmit={disableTotp} className="space-y-3 max-w-sm">
+              <p className="text-sm text-zinc-300">
+                To turn off 2FA, enter your password and a current code from the app:
+              </p>
+              <input
+                type="password"
+                value={disablePw}
+                onChange={(e) => setDisablePw(e.target.value)}
+                placeholder="Current password"
+                className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <input
+                value={disableCode}
+                onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="6-digit code"
+                maxLength={6}
+                className="w-40 px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-center font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <button
+                type="submit"
+                disabled={totpBusy || !disablePw || disableCode.length !== 6}
+                className="px-4 py-2 rounded-lg bg-red-600/80 hover:bg-red-600 text-white text-sm font-medium disabled:opacity-50"
+              >
+                {totpBusy ? 'Disabling…' : 'Disable 2FA'}
+              </button>
+            </form>
+          )}
         </div>
 
         {/* System info */}

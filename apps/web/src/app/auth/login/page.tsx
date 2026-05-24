@@ -11,6 +11,8 @@ import { useI18n } from '@/lib/i18n';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [totp, setTotp] = useState('');
+  const [needTotp, setNeedTotp] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
@@ -23,8 +25,12 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
-      router.push('/');
+      const r = await login(email, password, needTotp ? totp : undefined);
+      if (r.totpRequired) {
+        setNeedTotp(true);
+      } else {
+        router.push('/');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -113,9 +119,34 @@ export default function LoginPage() {
               />
             </FieldWithIcon>
 
+            {needTotp && (
+              <div>
+                <label className="block text-xs text-zinc-400 uppercase mb-2">
+                  Two-factor code
+                </label>
+                <input
+                  value={totp}
+                  onChange={(e) => setTotp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  maxLength={6}
+                  autoFocus
+                  className="w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/10 text-white text-center font-mono text-lg tracking-widest focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500/60"
+                />
+              </div>
+            )}
+
+            <div className="flex items-center justify-end">
+              <Link
+                href="/auth/forgot"
+                className="text-xs text-zinc-400 hover:text-brand-300"
+              >
+                Forgot password?
+              </Link>
+            </div>
+
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || (needTotp && totp.length !== 6)}
               className="w-full py-3 rounded-xl bg-brand-gradient text-white font-medium transition-transform hover:-translate-y-0.5 hover:shadow-brand disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isLoading ? t('common.loading') : (

@@ -7,7 +7,7 @@ interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, totp?: string) => Promise<{ totpRequired?: boolean }>;
   signup: (email: string, password: string, fullName: string, branchId: string) => Promise<void>;
   logout: () => void;
 }
@@ -24,12 +24,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, totp?: string) => {
     setIsLoading(true);
     try {
-      const response = await apiLogin(email, password);
+      const response = await apiLogin(email, password, totp);
+      if ('totpRequired' in response) {
+        return { totpRequired: true };
+      }
       setAuth(response.accessToken, response.user);
       setUser(response.user);
+      return {};
     } finally {
       setIsLoading(false);
     }
