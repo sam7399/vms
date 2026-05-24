@@ -138,7 +138,8 @@ model Visitor {
   company        String?   @db.VarChar(255)
   documentType   DocumentType
   documentNumber String    @db.VarChar(100)
-  faceData       Bytes?
+  faceData       Bytes?    // raw photo (JPEG)
+  faceEmbedding  Bytes?    // face-api.js Float32Array(128) serialized
   isBlacklisted  Boolean   @default(false)
   visits         Visit[]
   createdAt      DateTime  @default(now())
@@ -224,9 +225,13 @@ model Worker {
   documentNumber String    @db.VarChar(100)
   skillCategory  String    @db.VarChar(100)
   faceData       Bytes?
+  faceEmbedding  Bytes?    // face-api.js Float32Array(128) serialized
   medicalExpiry  DateTime
   policeVerified Boolean   @default(false)
   isActive       Boolean   @default(true)
+  pfNumber       String?   @db.VarChar(50)
+  esicNumber     String?   @db.VarChar(50)
+  hourlyRate     Float?
   contractor     Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
   attendance     Attendance[]
   shifts         WorkerShift[]

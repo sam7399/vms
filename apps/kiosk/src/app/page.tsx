@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { QrScanner } from "../components/QrScanner";
+import { FaceIdentify } from "../components/FaceIdentify";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-type Tab = "token" | "walk-in";
+type Tab = "token" | "walk-in" | "face";
 
 interface Branch { id: string; name: string; location: string }
 interface Host { id: string; fullName: string; branchId: string }
@@ -42,10 +43,13 @@ export default function KioskPage() {
 
         <div className="flex gap-2 mb-4">
           <TabButton active={tab === "token"} onClick={() => setTab("token")}>
-            Check in (token)
+            Token
           </TabButton>
           <TabButton active={tab === "walk-in"} onClick={() => setTab("walk-in")}>
-            Walk-in registration
+            Walk-in
+          </TabButton>
+          <TabButton active={tab === "face"} onClick={() => setTab("face")}>
+            Face
           </TabButton>
         </div>
 
@@ -53,8 +57,10 @@ export default function KioskPage() {
           <SuccessPanel state={success} onReset={() => setSuccess(null)} />
         ) : tab === "token" ? (
           <TokenForm onSuccess={setSuccess} setError={setError} />
-        ) : (
+        ) : tab === "walk-in" ? (
           <WalkInForm onSuccess={setSuccess} setError={setError} />
+        ) : (
+          <FaceIdentify />
         )}
 
         {error && (

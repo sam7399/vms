@@ -325,6 +325,9 @@ export class AdminService {
       skillCategory: string;
       medicalExpiry: string;
       policeVerified?: boolean;
+      pfNumber?: string;
+      esicNumber?: string;
+      hourlyRate?: number;
     },
   ) {
     const required = [
@@ -359,8 +362,89 @@ export class AdminService {
         skillCategory: data.skillCategory,
         medicalExpiry: new Date(data.medicalExpiry),
         policeVerified: data.policeVerified ?? false,
+        pfNumber: data.pfNumber?.slice(0, 50) || null,
+        esicNumber: data.esicNumber?.slice(0, 50) || null,
+        hourlyRate: typeof data.hourlyRate === 'number' && Number.isFinite(data.hourlyRate)
+          ? data.hourlyRate
+          : null,
       },
     });
+  }
+
+  /**
+   * Hours-worked + overtime report. For each worker with attendance in the
+   * window: total hours, overtime hours (> 8 / day), estimated pay if
+   * hourlyRate is set.
+   */
+  async workerHoursReport(user: JwtUser, days = 7) {
+    const cap = Math.min(Math.max(days, 1), 90);
+    const since = new Date(Date.now() - cap * 24 * 60 * 60 * 1000);
+
+    const records = await prisma.attendance.findMany({
+      where: {
+        checkOut: { not: null },
+        checkIn: { gte: since },
+        ...attendanceScope(user),
+      },
+      include: {
+        worker: {
+          select: {
+            id: true,
+            fullName: true,
+            skillCategory: true,
+            hourlyRate: true,
+            pfNumber: true,
+            esicNumber: true,
+            contractor: { select: { companyName: true } },
+          },
+        },
+      },
+    });
+
+    // Aggregate per worker per day, then sum
+    const perWorkerDay = new Map<string, { day: string; hours: number }[]>();
+    const workers = new Map<string, any>();
+
+    for (const r of records) {
+      if (!r.checkOut) continue;
+      const dayKey = r.checkIn.toISOString().slice(0, 10);
+      const hours = Math.max(0, (r.checkOut.getTime() - r.checkIn.getTime()) / 3_600_000);
+      const list = perWorkerDay.get(r.workerId) ?? [];
+      const existing = list.find((d) => d.day === dayKey);
+      if (existing) existing.hours += hours;
+      else list.push({ day: dayKey, hours });
+      perWorkerDay.set(r.workerId, list);
+      workers.set(r.workerId, r.worker);
+    }
+
+    const rows: any[] = [];
+    for (const [workerId, days] of perWorkerDay) {
+      const w = workers.get(workerId);
+      let total = 0;
+      let overtime = 0;
+      for (const d of days) {
+        total += d.hours;
+        if (d.hours > 8) overtime += d.hours - 8;
+      }
+      rows.push({
+        workerId,
+        fullName: w.fullName,
+        contractor: w.contractor.companyName,
+        skillCategory: w.skillCategory,
+        pfNumber: w.pfNumber,
+        esicNumber: w.esicNumber,
+        hourlyRate: w.hourlyRate,
+        daysWorked: days.length,
+        totalHours: Number(total.toFixed(2)),
+        overtimeHours: Number(overtime.toFixed(2)),
+        estimatedPay:
+          w.hourlyRate != null
+            ? Number(((total - overtime) * w.hourlyRate + overtime * w.hourlyRate * 1.5).toFixed(2))
+            : null,
+      });
+    }
+    rows.sort((a, b) => b.totalHours - a.totalHours);
+    return { windowDays: cap, rows };
   }
 
   async createHost(

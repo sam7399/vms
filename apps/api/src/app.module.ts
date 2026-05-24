@@ -10,6 +10,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { PublicModule } from './modules/public/public.module';
 import { MaterialPassModule } from './modules/material-pass/material-pass.module';
 import { WorkforceModule } from './modules/workforce/workforce.module';
+import { FaceModule } from './modules/face/face.module';
 import { HeadcountModule } from './gateways/headcount.module';
 import { HealthController } from './health.controller';
 
@@ -33,6 +34,7 @@ import { HealthController } from './health.controller';
     PublicModule,
     MaterialPassModule,
     WorkforceModule,
+    FaceModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

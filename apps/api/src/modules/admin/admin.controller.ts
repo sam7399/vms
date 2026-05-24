@@ -60,6 +60,12 @@ export class AdminController {
     return this.admin.getHeatmap(user, Number.isFinite(d) ? d : 30);
   }
 
+  @Get('worker-hours')
+  workerHours(@CurrentUser() user: JwtUser, @Query('days') days?: string) {
+    const d = days ? parseInt(days, 10) : 7;
+    return this.admin.workerHoursReport(user, Number.isFinite(d) ? d : 7);
+  }
+
   // --- Writes: scoped + role-checked -----------------------------
   @Post('contractors')
   @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER)

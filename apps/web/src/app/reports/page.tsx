@@ -9,7 +9,7 @@ import { apiGet } from '@/lib/api';
 import { downloadCSV } from '@/lib/csv';
 import { downloadPDF } from '@/lib/pdf';
 
-type ReportKey = 'visits' | 'attendance' | 'compliance' | 'contractors' | 'workers';
+type ReportKey = 'visits' | 'attendance' | 'compliance' | 'contractors' | 'workers' | 'workerHours';
 
 const REPORTS: { key: ReportKey; label: string; description: string; endpoint: string; flatten: (rows: any[]) => any[] }[] = [
   {
@@ -98,7 +98,30 @@ const REPORTS: { key: ReportKey; label: string; description: string; endpoint: s
         medicalExpiry: w.medicalExpiry,
         policeVerified: w.policeVerified,
         isActive: w.isActive,
+        pfNumber: w.pfNumber,
+        esicNumber: w.esicNumber,
+        hourlyRate: w.hourlyRate,
       })),
+  },
+  {
+    key: 'workerHours',
+    label: 'Worker hours & overtime',
+    description: 'Per-worker total hours, overtime (>8h/day), estimated pay (7d)',
+    endpoint: '/admin/worker-hours?days=7',
+    flatten: (raw: any) =>
+      (raw?.rows ?? raw)?.map((r: any) => ({
+        workerId: r.workerId,
+        fullName: r.fullName,
+        contractor: r.contractor,
+        skillCategory: r.skillCategory,
+        pfNumber: r.pfNumber,
+        esicNumber: r.esicNumber,
+        hourlyRate: r.hourlyRate,
+        daysWorked: r.daysWorked,
+        totalHours: r.totalHours,
+        overtimeHours: r.overtimeHours,
+        estimatedPay: r.estimatedPay,
+      })) ?? [],
   },
 ];
 
@@ -106,7 +129,7 @@ export default function ReportsPage() {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const [previews, setPreviews] = useState<Record<ReportKey, any[] | null>>({
-    visits: null, attendance: null, compliance: null, contractors: null, workers: null,
+    visits: null, attendance: null, compliance: null, contractors: null, workers: null, workerHours: null,
   });
   const [error, setError] = useState<string | null>(null);
   const [loadingKey, setLoadingKey] = useState<ReportKey | null>(null);

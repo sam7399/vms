@@ -62,6 +62,9 @@ function WorkersPageInner() {
     skillCategory: '',
     medicalExpiry: '',
     policeVerified: false,
+    pfNumber: '',
+    esicNumber: '',
+    hourlyRate: '',
   });
 
   useEffect(() => {
@@ -120,7 +123,10 @@ function WorkersPageInner() {
     setSubmitting(true);
     setError('');
     try {
-      await apiPost('/admin/workers', form);
+      const payload: any = { ...form };
+      if (form.hourlyRate) payload.hourlyRate = parseFloat(form.hourlyRate);
+      else delete payload.hourlyRate;
+      await apiPost('/admin/workers', payload);
       setForm({
         contractorId: contractorFilter,
         fullName: '',
@@ -130,6 +136,9 @@ function WorkersPageInner() {
         skillCategory: '',
         medicalExpiry: '',
         policeVerified: false,
+        pfNumber: '',
+        esicNumber: '',
+        hourlyRate: '',
       });
       setShowForm(false);
       await loadWorkers();
@@ -256,6 +265,30 @@ function WorkersPageInner() {
               />
               Police verified
             </label>
+
+            <input
+              type="text"
+              placeholder="PF number (optional)"
+              value={form.pfNumber}
+              onChange={(e) => setForm({ ...form, pfNumber: e.target.value })}
+              className="px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              type="text"
+              placeholder="ESIC number (optional)"
+              value={form.esicNumber}
+              onChange={(e) => setForm({ ...form, esicNumber: e.target.value })}
+              className="px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Hourly rate (₹)"
+              value={form.hourlyRate}
+              onChange={(e) => setForm({ ...form, hourlyRate: e.target.value })}
+              className="px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
 
             <div className="md:col-span-2 flex gap-3">
               <button
