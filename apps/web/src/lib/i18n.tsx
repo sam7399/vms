@@ -294,6 +294,30 @@ const EN: Record<string, string> = {
   'settings.memberSince': 'Member since',
   'settings.userId': 'User ID',
 
+  // Notices
+  'nav.notices': 'Notices',
+  'notices.title': 'Notice board',
+  'notices.subtitle': 'Branch and org-wide announcements. Live — new notices pop in real-time and push to mobile.',
+  'notices.new': 'New notice',
+  'notices.post': 'Post notice',
+  'notices.empty': 'No active notices.',
+  'notices.titlePlaceholder': 'Notice title',
+  'notices.bodyPlaceholder': 'What do people need to know?',
+  'notices.levelInfo': 'Info',
+  'notices.levelWarning': 'Warning',
+  'notices.levelUrgent': 'Urgent',
+  'notices.allBranches': 'All branches in org',
+  'notices.expiresAt': 'Expires at (optional)',
+  'notices.expires': 'expires',
+
+  // Visitor extras
+  'visitors.markVip': 'Mark VIP',
+  'visitors.unmarkVip': 'Remove VIP',
+
+  // Group visit
+  'checkin.groupSize': 'Group size',
+  'checkin.groupSizeHint': 'How many people will arrive together on this pass (1–20).',
+
   // Admin · Users
   'adminUsers.title': 'Users',
   'adminUsers.subtitle': 'Add or deactivate users. Roles drive what they can see and do.',
@@ -599,6 +623,27 @@ const HI: Record<string, string> = {
   'settings.role': 'भूमिका',
   'settings.memberSince': 'सदस्य बने',
   'settings.userId': 'उपयोगकर्ता ID',
+
+  'nav.notices': 'सूचनाएँ',
+  'notices.title': 'सूचना बोर्ड',
+  'notices.subtitle': 'शाखा और संगठन-व्यापी घोषणाएँ। लाइव — नई सूचनाएँ तुरंत दिखती हैं और मोबाइल पर पुश होती हैं।',
+  'notices.new': 'नई सूचना',
+  'notices.post': 'सूचना पोस्ट करें',
+  'notices.empty': 'अभी कोई सक्रिय सूचना नहीं।',
+  'notices.titlePlaceholder': 'सूचना का शीर्षक',
+  'notices.bodyPlaceholder': 'लोगों को क्या जानना चाहिए?',
+  'notices.levelInfo': 'जानकारी',
+  'notices.levelWarning': 'चेतावनी',
+  'notices.levelUrgent': 'अति आवश्यक',
+  'notices.allBranches': 'संगठन की सभी शाखाएँ',
+  'notices.expiresAt': 'समाप्ति समय (वैकल्पिक)',
+  'notices.expires': 'समाप्त',
+
+  'visitors.markVip': 'VIP बनाएँ',
+  'visitors.unmarkVip': 'VIP हटाएँ',
+
+  'checkin.groupSize': 'समूह आकार',
+  'checkin.groupSizeHint': 'इस पास पर एक साथ कितने लोग आएँगे (1–20)।',
 
   'adminUsers.title': 'उपयोगकर्ता',
   'adminUsers.subtitle': 'उपयोगकर्ता जोड़ें या निष्क्रिय करें। भूमिकाएँ निर्धारित करती हैं कि वे क्या देख सकते हैं।',

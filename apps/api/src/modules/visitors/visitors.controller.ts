@@ -98,4 +98,10 @@ export class VisitorsController {
   ) {
     return this.visitorsService.updateVisitStatus(user, id, body.status);
   }
+
+  @Put(':id/vip')
+  @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER, Role.RECEPTIONIST)
+  toggleVip(@Param('id') id: string, @Body() body: { isVip: boolean }) {
+    return this.visitorsService.setVip(id, !!body?.isVip);
+  }
 }

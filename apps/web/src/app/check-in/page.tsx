@@ -46,6 +46,7 @@ export default function CheckInPage() {
     hostId: '',
     vehicleNumber: '',
     expectedEntry: '',
+    groupSize: '1',
   });
   const [photo, setPhoto] = useState<string>('');
 
@@ -130,6 +131,7 @@ export default function CheckInPage() {
         purpose: form.purpose,
         expectedEntry: form.expectedEntry || new Date().toISOString(),
         vehicleNumber: form.vehicleNumber || undefined,
+        groupSize: Math.max(1, Math.min(20, parseInt(form.groupSize || '1', 10) || 1)),
       });
 
       setQrToken(visit.qrCodeToken);
@@ -237,6 +239,20 @@ export default function CheckInPage() {
                   className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+            </div>
+            <div>
+              <label className="block text-xs text-zinc-400 mb-1">
+                {t('checkin.groupSize')}
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={form.groupSize}
+                onChange={(e) => set('groupSize', e.target.value)}
+                className="w-full md:w-32 px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-zinc-500 mt-1">{t('checkin.groupSizeHint')}</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>

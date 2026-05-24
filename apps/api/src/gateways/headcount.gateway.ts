@@ -85,4 +85,13 @@ export class HeadcountGateway implements OnGatewayConnection, OnGatewayDisconnec
   broadcastSosClear() {
     this.server.emit('sos_clear', { ts: new Date().toISOString() });
   }
+
+  /** A new notice was posted — dashboards should surface it. */
+  broadcastNotice(notice: unknown) {
+    this.server.emit('notice_new', notice);
+  }
+
+  broadcastNoticeRemoved(id: string) {
+    this.server.emit('notice_removed', { id });
+  }
 }

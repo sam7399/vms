@@ -11,6 +11,7 @@ import { ComplianceAlerts } from "@/components/dashboard/ComplianceAlerts";
 import { VisitsChart } from "@/components/dashboard/VisitsChart";
 import { VisitsHeatmap } from "@/components/dashboard/VisitsHeatmap";
 import { AnomaliesBanner } from "@/components/dashboard/AnomaliesBanner";
+import { NoticesWidget } from "@/components/dashboard/NoticesWidget";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { useI18n } from "@/lib/i18n";
 
@@ -59,6 +60,7 @@ export default function DashboardPage() {
           <LiveHeadcountCard branchId={branchId} />
         </div>
 
+        <NoticesWidget />
         <ComplianceAlerts />
         <AnomaliesBanner />
 

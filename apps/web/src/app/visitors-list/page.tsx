@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
-import { Search, ShieldX, ShieldCheck, Users, Download } from 'lucide-react';
+import { Search, ShieldX, ShieldCheck, Users, Download, Star } from 'lucide-react';
 import { apiGet, apiPut } from '@/lib/api';
 import { downloadCSV } from '@/lib/csv';
 import { FaceEnrollButton } from '@/components/face-enroll-button';
@@ -19,6 +19,7 @@ interface Visitor {
   documentType: string;
   documentNumber: string;
   isBlacklisted: boolean;
+  isVip: boolean;
   createdAt: string;
   _count: { visits: number };
 }
@@ -54,6 +55,19 @@ export default function VisitorsListPage() {
     setError(null);
     try {
       await apiPut(`/admin/visitors/${v.id}/blacklist`, { blacklist: !v.isBlacklisted });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Update failed');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function toggleVip(v: Visitor) {
+    setBusyId(v.id);
+    setError(null);
+    try {
+      await apiPut(`/visitors/${v.id}/vip`, { isVip: !v.isVip });
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Update failed');
@@ -185,7 +199,15 @@ export default function VisitorsListPage() {
                       className={`hover:bg-white/5 ${v.isBlacklisted ? 'bg-red-500/5' : ''}`}
                     >
                       <td className="p-4">
-                        <p className="font-medium text-white">{v.fullName}</p>
+                        <p className="font-medium text-white flex items-center gap-1.5">
+                          {v.fullName}
+                          {v.isVip && (
+                            <Star
+                              className="w-3.5 h-3.5 text-amber-300 fill-amber-300"
+                              aria-label="VIP"
+                            />
+                          )}
+                        </p>
                         <p className="text-xs text-zinc-500">
                           {v.phone} {v.email && `· ${v.email}`}
                         </p>
@@ -215,6 +237,19 @@ export default function VisitorsListPage() {
                         <div className="flex justify-end gap-2 flex-wrap">
                           <FaceEnrollButton kind="visitor" id={v.id} label="Face" />
                           <button
+                            onClick={() => toggleVip(v)}
+                            disabled={busyId === v.id}
+                            className={`px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50 inline-flex items-center gap-1 ${
+                              v.isVip
+                                ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200'
+                                : 'bg-white/5 hover:bg-white/10 text-zinc-300'
+                            }`}
+                            title={v.isVip ? t('visitors.unmarkVip') : t('visitors.markVip')}
+                          >
+                            <Star className={`w-3 h-3 ${v.isVip ? 'fill-amber-300' : ''}`} />
+                            VIP
+                          </button>
+                          <button
                             onClick={() => toggleBlacklist(v)}
                             disabled={busyId === v.id}
                             className={`px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50 ${
@@ -223,7 +258,7 @@ export default function VisitorsListPage() {
                                 : 'bg-red-600/80 hover:bg-red-600 text-white'
                             }`}
                           >
-                            {v.isBlacklisted ? 'Un-blacklist' : 'Blacklist'}
+                            {v.isBlacklisted ? t('visitors.unblacklist') : t('visitors.blacklist')}
                           </button>
                         </div>
                       </td>

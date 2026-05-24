@@ -10,6 +10,7 @@ const EN: Record<string, string> = {
   "tab.workers": "Workers",
   "tab.invite": "Invite",
   "tab.face": "Verify",
+  "tab.notices": "Notices",
   "tab.signOut": "Sign out",
   "auth.signIn": "Sign in",
   "auth.email": "Email",
@@ -48,6 +49,9 @@ const EN: Record<string, string> = {
   "face.onSite": "On-site now",
   "face.noneOnSite": "No one is currently inside.",
   "face.host": "Host",
+  "notices.title": "Notice board",
+  "notices.subtitle": "Branch and org-wide announcements.",
+  "notices.empty": "No active notices.",
 };
 
 const HI: Record<string, string> = {
@@ -57,6 +61,7 @@ const HI: Record<string, string> = {
   "tab.workers": "कर्मचारी",
   "tab.invite": "आमंत्रित",
   "tab.face": "सत्यापन",
+  "tab.notices": "सूचनाएँ",
   "tab.signOut": "साइन आउट",
   "auth.signIn": "साइन इन",
   "auth.email": "ईमेल",
@@ -95,6 +100,9 @@ const HI: Record<string, string> = {
   "face.onSite": "अभी अंदर",
   "face.noneOnSite": "अभी कोई अंदर नहीं है।",
   "face.host": "होस्ट",
+  "notices.title": "सूचना बोर्ड",
+  "notices.subtitle": "शाखा और संगठन-व्यापी घोषणाएँ।",
+  "notices.empty": "अभी कोई सक्रिय सूचना नहीं।",
 };
 
 const DICT: Record<Lang, Record<string, string>> = { en: EN, hi: HI };

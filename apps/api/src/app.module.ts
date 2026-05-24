@@ -13,6 +13,7 @@ import { WorkforceModule } from './modules/workforce/workforce.module';
 import { FaceModule } from './modules/face/face.module';
 import { SosModule } from './modules/sos/sos.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { NoticesModule } from './modules/notices/notices.module';
 import { HeadcountModule } from './gateways/headcount.module';
 import { HealthController } from './health.controller';
 
@@ -39,6 +40,7 @@ import { HealthController } from './health.controller';
     FaceModule,
     SosModule,
     NotificationsModule,
+    NoticesModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

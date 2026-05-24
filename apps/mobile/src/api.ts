@@ -175,4 +175,18 @@ export const api = {
       method: "POST",
       body: { token },
     }),
+
+  // Notices / announcements
+  listNotices: () =>
+    request<
+      Array<{
+        id: string;
+        title: string;
+        body: string;
+        level: "info" | "warning" | "urgent";
+        authorName: string;
+        createdAt: string;
+        expiresAt: string | null;
+      }>
+    >("/notices"),
 };

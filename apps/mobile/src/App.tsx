@@ -8,6 +8,7 @@ import { WorkersScreen } from "./screens/WorkersScreen";
 import { DashboardScreen } from "./screens/DashboardScreen";
 import { InviteScreen } from "./screens/InviteScreen";
 import { FaceVerifyScreen } from "./screens/FaceVerifyScreen";
+import { NoticesScreen } from "./screens/NoticesScreen";
 import { clearSession, getUser, SessionUser } from "./api";
 import { I18nProvider, useI18n } from "./i18n";
 import { registerForPushNotifications } from "./push";
@@ -34,7 +35,7 @@ type AuthState =
   | { kind: "gate" }
   | { kind: "authed"; user: SessionUser };
 
-type Tab = "dashboard" | "checkin" | "face" | "approvals" | "workers" | "invite";
+type Tab = "dashboard" | "checkin" | "face" | "approvals" | "notices" | "workers" | "invite";
 
 export default function App() {
   return (
@@ -120,6 +121,7 @@ function AppInner() {
           {tab === "dashboard" && <DashboardScreen user={auth.user} />}
           {tab === "checkin" && <CheckInScreen />}
           {tab === "face" && <FaceVerifyScreen />}
+          {tab === "notices" && <NoticesScreen />}
           {tab === "approvals" && <ApprovalsScreen user={auth.user} />}
           {tab === "workers" && showWorkers && <WorkersScreen user={auth.user} />}
           {tab === "invite" && showInvite && <InviteScreen user={auth.user} />}
@@ -134,6 +136,7 @@ function AppInner() {
           <TabButton label={t("tab.dashboard")} active={tab === "dashboard"} onPress={() => setTab("dashboard")} />
           <TabButton label={t("tab.checkIn")} active={tab === "checkin"} onPress={() => setTab("checkin")} />
           <TabButton label={t("tab.face")} active={tab === "face"} onPress={() => setTab("face")} />
+          <TabButton label={t("tab.notices")} active={tab === "notices"} onPress={() => setTab("notices")} />
           <TabButton label={t("tab.approvals")} active={tab === "approvals"} onPress={() => setTab("approvals")} />
           {showWorkers && (
             <TabButton label={t("tab.workers")} active={tab === "workers"} onPress={() => setTab("workers")} />

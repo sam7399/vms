@@ -45,6 +45,9 @@ export class VisitorsService {
     }
 
     const qrToken = crypto.randomBytes(16).toString('hex');
+    const groupSize = Number.isFinite(data.groupSize) && data.groupSize >= 1
+      ? Math.min(20, Math.floor(data.groupSize))
+      : 1;
 
     return prisma.visit.create({
       data: {
@@ -55,8 +58,17 @@ export class VisitorsService {
         expectedEntry: new Date(data.expectedEntry),
         vehicleNumber: data.vehicleNumber,
         qrCodeToken: qrToken,
+        groupSize,
         status: data.status === 'APPROVED' ? VisitStatus.APPROVED : VisitStatus.PENDING,
       },
+    });
+  }
+
+  async setVip(visitorId: string, isVip: boolean) {
+    return prisma.visitor.update({
+      where: { id: visitorId },
+      data: { isVip },
+      select: { id: true, fullName: true, isVip: true },
     });
   }
 

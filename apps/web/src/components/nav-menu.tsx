@@ -49,6 +49,7 @@ const CATEGORIES: Category[] = [
     items: [
       { href: '/reports', key: 'nav.reports' },
       { href: '/audit', key: 'nav.audit' },
+      { href: '/notices', key: 'nav.notices' },
     ],
   },
   {
