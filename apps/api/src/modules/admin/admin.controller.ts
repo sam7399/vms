@@ -23,6 +23,28 @@ export class AdminController {
     return this.admin.listHosts(user);
   }
 
+  @Get('users')
+  @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN)
+  users(@CurrentUser() user: JwtUser) {
+    return this.admin.listUsers(user);
+  }
+
+  @Put('users/:id/active')
+  @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN)
+  setUserActive(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body: { isActive: boolean },
+  ) {
+    return this.admin.setUserActive(user, id, !!body?.isActive);
+  }
+
+  @Post('branches')
+  @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN)
+  createBranch(@CurrentUser() user: JwtUser, @Body() body: any) {
+    return this.admin.createBranch(user, body);
+  }
+
   @Get('visitors')
   visitors(@CurrentUser() user: JwtUser) {
     return this.admin.listVisitors(user);

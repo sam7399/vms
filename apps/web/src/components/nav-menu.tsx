@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, LayoutDashboard, Users, HardHat, Building2, BarChart3, BookOpen, Settings as SettingsIcon } from 'lucide-react';
+import { ChevronDown, LayoutDashboard, Users, HardHat, Building2, BarChart3, BookOpen, Settings as SettingsIcon, ShieldCheck } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 
 interface Item {
@@ -49,6 +49,15 @@ const CATEGORIES: Category[] = [
     items: [
       { href: '/reports', key: 'nav.reports' },
       { href: '/audit', key: 'nav.audit' },
+    ],
+  },
+  {
+    key: 'nav.admin',
+    icon: ShieldCheck,
+    items: [
+      { href: '/admin/users', key: 'nav.users' },
+      { href: '/admin/branches', key: 'nav.branches' },
+      { href: '/about', key: 'nav.about' },
     ],
   },
 ];

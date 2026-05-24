@@ -4,6 +4,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { I18nProvider } from "@/lib/i18n";
 import { BrandFooter } from "@/components/brand-footer";
 import { NotificationToaster } from "@/components/notification-toaster";
+import { SosBanner } from "@/components/sos-banner";
 
 export const metadata: Metadata = {
   title: "VMS — Visitor Management System | TSI by Personify Crafters",
@@ -47,6 +48,7 @@ export default function RootLayout({
               <div className="relative z-10 flex-1">{children}</div>
               <BrandFooter />
             </div>
+            <SosBanner />
             <NotificationToaster />
           </AuthProvider>
         </I18nProvider>

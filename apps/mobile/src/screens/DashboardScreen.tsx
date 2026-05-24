@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -71,6 +73,37 @@ export function DashboardScreen({ user }: { user: SessionUser }) {
       </View>
 
       <Text style={styles.refreshHint}>Pull down to refresh · auto-refreshes every 20s</Text>
+
+      {/* SOS — always at the bottom, hold-to-confirm pattern */}
+      <Pressable
+        onPress={() => {
+          Alert.alert(
+            "Trigger SOS?",
+            "Every connected dashboard will get a red alert. Use only in real emergencies.",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Trigger",
+                style: "destructive",
+                onPress: async () => {
+                  try {
+                    await api.sosTrigger();
+                    Alert.alert("SOS sent", "Security has been alerted.");
+                  } catch (e) {
+                    Alert.alert(
+                      "Failed",
+                      e instanceof Error ? e.message : "Could not send SOS",
+                    );
+                  }
+                },
+              },
+            ],
+          );
+        }}
+        style={styles.sosBtn}
+      >
+        <Text style={styles.sosText}>🚨  EMERGENCY SOS</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -126,4 +159,17 @@ const styles = StyleSheet.create({
   cardValue: { fontSize: 36, fontWeight: "700" },
   cardValueSmall: { fontSize: 26 },
   refreshHint: { color: "#475569", fontSize: 11, textAlign: "center", marginTop: 18 },
+  sosBtn: {
+    marginTop: 32,
+    backgroundColor: "#dc2626",
+    borderRadius: 16,
+    paddingVertical: 18,
+    alignItems: "center",
+    shadowColor: "#dc2626",
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  sosText: { color: "#fff", fontWeight: "700", fontSize: 17, letterSpacing: 1.5 },
 });

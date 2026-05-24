@@ -131,4 +131,8 @@ export const api = {
       body: { embedding },
       auth: false,
     }),
+
+  // SOS — broadcasts to every connected dashboard
+  sosTrigger: (message?: string) =>
+    request<{ ok: boolean }>("/sos/trigger", { method: "POST", body: { message } }),
 };

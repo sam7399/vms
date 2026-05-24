@@ -70,4 +70,19 @@ export class HeadcountGateway implements OnGatewayConnection, OnGatewayDisconnec
   }) {
     this.server.emit('notification', { ...payload, ts: new Date().toISOString() });
   }
+
+  /** Persistent emergency alert visible until cleared on every dashboard. */
+  broadcastSos(payload: {
+    actorEmail: string;
+    actorName: string;
+    branchName?: string;
+    message?: string;
+  }) {
+    this.server.emit('sos', { ...payload, ts: new Date().toISOString() });
+  }
+
+  /** Clear the active SOS banner. */
+  broadcastSosClear() {
+    this.server.emit('sos_clear', { ts: new Date().toISOString() });
+  }
 }

@@ -34,6 +34,66 @@ export class AdminService {
     });
   }
 
+  listUsers(user: JwtUser) {
+    return prisma.user.findMany({
+      where: userScope(user),
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        role: true,
+        branchId: true,
+        isActive: true,
+        totpEnabled: true,
+        createdAt: true,
+        branch: { select: { name: true } },
+      },
+      orderBy: [{ isActive: 'desc' }, { fullName: 'asc' }],
+    });
+  }
+
+  async setUserActive(user: JwtUser, id: string, isActive: boolean) {
+    // Scope: can only edit users in your org
+    if (!isSuperAdmin(user)) {
+      const found = await prisma.user.findFirst({
+        where: { id, ...userScope(user) },
+        select: { id: true },
+      });
+      if (!found) throw new NotFoundException('User not found in your organization');
+    }
+    return prisma.user.update({
+      where: { id },
+      data: { isActive },
+      select: { id: true, fullName: true, email: true, isActive: true },
+    });
+  }
+
+  async createBranch(
+    user: JwtUser,
+    data: { name: string; location: string; organizationId?: string },
+  ) {
+    if (!data.name || !data.location) {
+      throw new BadRequestException('name and location are required');
+    }
+    let orgId = data.organizationId;
+    if (isSuperAdmin(user)) {
+      if (!orgId) {
+        const first = await prisma.organization.findFirst();
+        if (!first) throw new BadRequestException('No organization exists yet');
+        orgId = first.id;
+      }
+    } else {
+      orgId = requireOrg(user);
+    }
+    return prisma.branch.create({
+      data: {
+        name: data.name.slice(0, 255),
+        location: data.location.slice(0, 500),
+        organizationId: orgId!,
+      },
+    });
+  }
+
   listVisitors(user: JwtUser) {
     return prisma.visitor.findMany({
       where: visitorScope(user),

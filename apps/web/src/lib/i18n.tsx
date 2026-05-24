@@ -28,6 +28,10 @@ const EN: Record<string, string> = {
   'nav.materials': 'Material pass',
   'nav.reports': 'Reports',
   'nav.audit': 'Audit log',
+  'nav.admin': 'Admin',
+  'nav.users': 'Users',
+  'nav.branches': 'Branches',
+  'nav.about': 'About',
 
   // Top-bar
   'topbar.lang': 'Language',
@@ -316,6 +320,10 @@ const HI: Record<string, string> = {
   'nav.materials': 'सामग्री पास',
   'nav.reports': 'रिपोर्ट',
   'nav.audit': 'ऑडिट लॉग',
+  'nav.admin': 'व्यवस्थापन',
+  'nav.users': 'उपयोगकर्ता',
+  'nav.branches': 'शाखाएँ',
+  'nav.about': 'जानकारी',
 
   'topbar.lang': 'भाषा',
   'topbar.subtitle': 'एंटरप्राइज़ आगंतुक एवं कार्यबल प्रबंधन',
