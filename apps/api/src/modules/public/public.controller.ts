@@ -21,4 +21,9 @@ export class PublicController {
   walkIn(@Body() body: any) {
     return this.publicService.walkIn(body);
   }
+
+  @Post('lookup')
+  lookup(@Body() body: { phone: string }) {
+    return this.publicService.lookupByPhone(body?.phone ?? '');
+  }
 }

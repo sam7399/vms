@@ -119,12 +119,35 @@ model Visit {
   visitor       Visitor     @relation(fields: [visitorId], references: [id], onDelete: Cascade)
   branch        Branch      @relation(fields: [branchId], references: [id], onDelete: Cascade)
   host          User        @relation("HostToVisit", fields: [hostId], references: [id], onDelete: Restrict)
+  materialPasses MaterialGatePass[]
 
   @@index([visitorId])
   @@index([branchId])
   @@index([hostId])
   @@index([status])
   @@index([expectedEntry])
+}
+
+enum PassDirection {
+  IN
+  OUT
+}
+
+model MaterialGatePass {
+  id            String        @id @default(uuid())
+  visitId       String
+  direction     PassDirection
+  description   String        @db.VarChar(1000)
+  quantity      Int           @default(1)
+  serialNumber  String?       @db.VarChar(200)
+  recordedBy    String?       @db.VarChar(255) // free text — user name / "kiosk" / "guard X"
+  createdAt     DateTime      @default(now())
+
+  visit         Visit         @relation(fields: [visitId], references: [id], onDelete: Cascade)
+
+  @@index([visitId])
+  @@index([direction])
+  @@index([createdAt])
 }
 
 model Contractor {

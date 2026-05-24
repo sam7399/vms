@@ -8,6 +8,7 @@ import { GateModule } from './modules/gate/gate.module';
 import { ComplianceModule } from './modules/compliance/compliance.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { PublicModule } from './modules/public/public.module';
+import { MaterialPassModule } from './modules/material-pass/material-pass.module';
 import { HeadcountModule } from './gateways/headcount.module';
 import { HealthController } from './health.controller';
 
@@ -29,6 +30,7 @@ import { HealthController } from './health.controller';
     ComplianceModule,
     AdminModule,
     PublicModule,
+    MaterialPassModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

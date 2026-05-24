@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { QrScanner } from "../components/QrScanner";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -99,16 +100,17 @@ function TokenForm({
 }) {
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submitToken(value: string) {
+    if (!value.trim()) return;
     setError(null);
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/gate/check-in`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ qrCodeToken: token.trim() }),
+        body: JSON.stringify({ qrCodeToken: value.trim() }),
       });
       if (!res.ok) {
         const body = await res.text();
@@ -123,6 +125,7 @@ function TokenForm({
         isWalkIn: false,
       });
       setToken("");
+      setScanning(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error");
     } finally {
@@ -131,29 +134,64 @@ function TokenForm({
   }
 
   return (
-    <form
-      onSubmit={submit}
-      className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur space-y-4"
-    >
-      <p className="text-sm text-slate-400">
-        Paste your QR token (from the pass link or visitor badge)
-      </p>
-      <input
-        type="text"
-        value={token}
-        onChange={(e) => setToken(e.target.value)}
-        placeholder="QR token"
-        autoFocus
-        className="w-full rounded-lg border border-white/10 bg-slate-950/50 px-4 py-3 text-lg outline-none focus:border-blue-400"
-      />
-      <button
-        type="submit"
-        disabled={loading || !token.trim()}
-        className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {loading ? "Checking in…" : "Check In"}
-      </button>
-    </form>
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur space-y-4">
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setScanning(false)}
+          className={`flex-1 px-3 py-2 rounded text-sm font-medium ${
+            !scanning ? "bg-blue-600 text-white" : "bg-white/5 text-slate-300"
+          }`}
+        >
+          Paste token
+        </button>
+        <button
+          type="button"
+          onClick={() => setScanning(true)}
+          className={`flex-1 px-3 py-2 rounded text-sm font-medium ${
+            scanning ? "bg-blue-600 text-white" : "bg-white/5 text-slate-300"
+          }`}
+        >
+          Scan QR
+        </button>
+      </div>
+
+      {scanning ? (
+        <>
+          <p className="text-xs text-slate-400">
+            Point the camera at the visitor's QR. Browser may ask for camera permission.
+          </p>
+          <QrScanner active={scanning} onScan={(text) => submitToken(text)} />
+          {loading && (
+            <p className="text-center text-blue-300 text-sm">Checking in…</p>
+          )}
+        </>
+      ) : (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            submitToken(token);
+          }}
+          className="space-y-3"
+        >
+          <input
+            type="text"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            placeholder="QR token"
+            autoFocus
+            className="w-full rounded-lg border border-white/10 bg-slate-950/50 px-4 py-3 text-lg outline-none focus:border-blue-400"
+          />
+          <button
+            type="submit"
+            disabled={loading || !token.trim()}
+            className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? "Checking in…" : "Check In"}
+          </button>
+        </form>
+      )}
+    </div>
   );
 }
 

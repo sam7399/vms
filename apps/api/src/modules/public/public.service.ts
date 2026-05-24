@@ -20,6 +20,57 @@ export class PublicService {
     });
   }
 
+  /**
+   * Public-by-phone lookup. Returns the visitor's recent visits — name,
+   * status, timestamps, branch — no document numbers or internal fields.
+   * Throttler limits hit rate so this is not an enumeration oracle.
+   */
+  async lookupByPhone(phone: string) {
+    const trimmed = (phone || '').trim();
+    if (trimmed.length < 5) {
+      throw new BadRequestException('phone is required');
+    }
+    const visitor = await prisma.visitor.findUnique({
+      where: { phone: trimmed },
+      select: {
+        id: true,
+        fullName: true,
+        company: true,
+        isBlacklisted: true,
+        visits: {
+          take: 30,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            status: true,
+            purpose: true,
+            expectedEntry: true,
+            actualEntry: true,
+            actualExit: true,
+            vehicleNumber: true,
+            qrCodeToken: true,
+            branch: { select: { name: true, location: true } },
+            host: { select: { fullName: true } },
+          },
+        },
+      },
+    });
+    if (!visitor) {
+      // Same shape for missing as found-but-empty — don't enumerate
+      return { found: false, fullName: null, visits: [] };
+    }
+    return {
+      found: true,
+      fullName: visitor.fullName,
+      company: visitor.company,
+      blacklisted: visitor.isBlacklisted,
+      visits: visitor.visits.map((v) => ({
+        ...v,
+        passUrl: `/pass/${v.id}`,
+      })),
+    };
+  }
+
   listHosts() {
     return prisma.user.findMany({
       where: { isActive: true },
