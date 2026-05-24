@@ -18,6 +18,44 @@ export class NotificationsService {
   private readonly from =
     process.env.RESEND_FROM ||
     'VMS <onboarding@resend.dev>'; // resend's sandbox sender — works without domain verification but only to verified test addresses
+  private readonly telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+  private readonly telegramChatId = process.env.TELEGRAM_CHAT_ID;
+
+  /**
+   * Free notification channel via Telegram Bot API. No-op without
+   * TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID env vars.
+   * To set up: create a bot via @BotFather → get token, then add the
+   * bot to your group/channel and look up the chat id.
+   */
+  async telegram(text: string): Promise<{ sent: boolean; reason?: string }> {
+    if (!this.telegramToken || !this.telegramChatId) {
+      return { sent: false, reason: 'TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set' };
+    }
+    try {
+      const res = await fetch(
+        `https://api.telegram.org/bot${this.telegramToken}/sendMessage`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: this.telegramChatId,
+            text,
+            parse_mode: 'HTML',
+            disable_web_page_preview: true,
+          }),
+        },
+      );
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        this.log.warn(`Telegram ${res.status}: ${body}`);
+        return { sent: false, reason: `Telegram HTTP ${res.status}` };
+      }
+      return { sent: true };
+    } catch (e: any) {
+      this.log.warn(`Telegram send failed: ${e?.message ?? e}`);
+      return { sent: false, reason: e?.message ?? 'network error' };
+    }
+  }
 
   async send({ to, subject, html }: SendArgs): Promise<{ sent: boolean; reason?: string }> {
     if (!this.apiKey) {

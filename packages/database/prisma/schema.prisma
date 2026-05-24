@@ -232,6 +232,7 @@ model Worker {
   pfNumber       String?   @db.VarChar(50)
   esicNumber     String?   @db.VarChar(50)
   hourlyRate     Float?
+  qrCodeToken    String?   @unique @db.VarChar(500)  // permanent gate-scan token
   contractor     Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
   attendance     Attendance[]
   shifts         WorkerShift[]

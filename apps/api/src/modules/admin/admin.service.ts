@@ -367,8 +367,86 @@ export class AdminService {
         hourlyRate: typeof data.hourlyRate === 'number' && Number.isFinite(data.hourlyRate)
           ? data.hourlyRate
           : null,
+        qrCodeToken: 'WK-' + require('crypto').randomBytes(8).toString('hex').toUpperCase(),
       },
     });
+  }
+
+  /**
+   * Bulk-import workers from CSV text. Header expected (case-insensitive):
+   *   contractorId, fullName, phone, documentNumber, skillCategory, medicalExpiry,
+   *   [documentType], [policeVerified], [pfNumber], [esicNumber], [hourlyRate]
+   * Returns per-row outcome.
+   */
+  async bulkImportWorkers(user: JwtUser, csv: string) {
+    if (!csv || typeof csv !== 'string') {
+      throw new BadRequestException('csv body required');
+    }
+    const lines = csv
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length < 2) {
+      throw new BadRequestException('CSV needs a header row and at least one data row');
+    }
+    const splitCsv = (line: string) =>
+      // simple split — quoted commas not supported; good enough for templates
+      line.split(',').map((c) => c.trim());
+
+    const header = splitCsv(lines[0]).map((h) => h.toLowerCase());
+    const idx = (name: string) => header.indexOf(name.toLowerCase());
+
+    const required = [
+      'contractorid',
+      'fullname',
+      'phone',
+      'documentnumber',
+      'skillcategory',
+      'medicalexpiry',
+    ];
+    for (const r of required) {
+      if (idx(r) < 0) {
+        throw new BadRequestException(`CSV missing required column: ${r}`);
+      }
+    }
+
+    const results: Array<{ row: number; ok: boolean; id?: string; error?: string; fullName?: string }> = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = splitCsv(lines[i]);
+      const get = (name: string) => cols[idx(name)];
+      try {
+        const created = await this.createWorker(user, {
+          contractorId: get('contractorid'),
+          fullName: get('fullname'),
+          phone: get('phone'),
+          documentType: ((idx('documenttype') >= 0 && get('documenttype')) || 'AADHAAR') as any,
+          documentNumber: get('documentnumber'),
+          skillCategory: get('skillcategory'),
+          medicalExpiry: get('medicalexpiry'),
+          policeVerified:
+            idx('policeverified') >= 0
+              ? ['true', '1', 'yes', 'y'].includes(get('policeverified').toLowerCase())
+              : false,
+          pfNumber: idx('pfnumber') >= 0 ? get('pfnumber') || undefined : undefined,
+          esicNumber: idx('esicnumber') >= 0 ? get('esicnumber') || undefined : undefined,
+          hourlyRate:
+            idx('hourlyrate') >= 0 && get('hourlyrate')
+              ? parseFloat(get('hourlyrate'))
+              : undefined,
+        });
+        results.push({ row: i + 1, ok: true, id: created.id, fullName: created.fullName });
+      } catch (e: any) {
+        results.push({ row: i + 1, ok: false, error: e?.message ?? 'unknown error' });
+      }
+    }
+
+    return {
+      total: results.length,
+      created: results.filter((r) => r.ok).length,
+      failed: results.filter((r) => !r.ok).length,
+      results,
+    };
   }
 
   /**

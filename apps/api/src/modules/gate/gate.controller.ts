@@ -29,6 +29,12 @@ export class GateController {
     return this.gateService.checkInByQrToken(body.qrCodeToken);
   }
 
+  // Public — kiosk scans a worker badge QR. Idempotent toggle (in/out).
+  @Post('worker-qr')
+  async workerQr(@Body() body: { qrCodeToken: string; gateId?: string; branchId?: string }) {
+    return this.gateService.workerQrToggle(body?.qrCodeToken, body?.gateId, body?.branchId);
+  }
+
   @Get('log/:gateId')
   @UseGuards(JwtAuthGuard)
   async getGateLog(@Param('gateId') gateId: string) {

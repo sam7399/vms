@@ -48,4 +48,5 @@ packages/database/prisma/migrations/dev.db*
 _seed.js
 _seed_org2.js
 _check_db.js
+_backfill_worker_qr.js
 .claude/

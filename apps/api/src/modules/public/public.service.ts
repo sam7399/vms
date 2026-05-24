@@ -170,6 +170,14 @@ export class PublicService {
       visitId: visit.id,
     });
 
+    // Free Telegram channel (no-op without TELEGRAM_BOT_TOKEN)
+    this.notifications
+      .telegram(
+        `🚶 <b>${visit.visitor.fullName}</b> walked in at <b>${visit.branch.name}</b>\n` +
+          `Host: ${visit.host.fullName}\nPurpose: ${data.purpose}`,
+      )
+      .catch(() => {});
+
     return {
       visitId: visit.id,
       qrCodeToken: visit.qrCodeToken,

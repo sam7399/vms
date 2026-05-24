@@ -4,7 +4,8 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
-import { Plus, ShieldCheck, ShieldOff, HardHat, LogIn, LogOut } from 'lucide-react';
+import { Plus, ShieldCheck, ShieldOff, HardHat, LogIn, LogOut, Upload, QrCode } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { apiGet, apiPost } from '@/lib/api';
 import { FaceEnrollButton } from '@/components/face-enroll-button';
 
@@ -37,6 +38,7 @@ interface Worker {
   medicalExpiry: string;
   policeVerified: boolean;
   isActive: boolean;
+  qrCodeToken: string | null;
   contractor?: { companyName: string };
 }
 
@@ -53,6 +55,11 @@ function WorkersPageInner() {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [importResult, setImportResult] = useState<any>(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [qrFor, setQrFor] = useState<Worker | null>(null);
 
   const [form, setForm] = useState({
     contractorId: contractorFilter,
@@ -119,6 +126,24 @@ function WorkersPageInner() {
     }
   }
 
+  async function handleImport(e: React.FormEvent) {
+    e.preventDefault();
+    if (!csvFile) return;
+    setImportBusy(true);
+    setImportResult(null);
+    setError('');
+    try {
+      const csv = await csvFile.text();
+      const r = await apiPost<any>('/admin/workers/bulk-import', { csv });
+      setImportResult(r);
+      await loadWorkers();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Import failed');
+    } finally {
+      setImportBusy(false);
+    }
+  }
+
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
@@ -174,13 +199,60 @@ function WorkersPageInner() {
                 : 'All registered workers across contractors'}
             </p>
           </div>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Add Worker
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowImport(!showImport)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm font-medium"
+              title="Bulk import workers from CSV"
+            >
+              <Upload className="w-4 h-4" /> Import CSV
+            </button>
+            <button
+              onClick={() => setShowForm(!showForm)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors"
+            >
+              <Plus className="w-4 h-4" /> Add Worker
+            </button>
+          </div>
         </div>
+
+        {showImport && (
+          <form onSubmit={handleImport} className="rounded-2xl border border-blue-500/20 bg-blue-500/10 p-6 mb-6 space-y-3">
+            <p className="text-sm text-zinc-300">
+              Upload a CSV with header row. Required columns:{' '}
+              <code className="text-blue-300">contractorId, fullName, phone, documentNumber, skillCategory, medicalExpiry</code>.{' '}
+              Optional: <code className="text-blue-300">documentType, policeVerified, pfNumber, esicNumber, hourlyRate</code>.
+            </p>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={(e) => setCsvFile(e.target.files?.[0] ?? null)}
+              className="block text-sm text-zinc-300 file:mr-4 file:py-2 file:px-3 file:rounded file:border-0 file:bg-blue-600 file:text-white file:hover:bg-blue-700 file:cursor-pointer"
+            />
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={!csvFile || importBusy}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium disabled:opacity-50"
+              >
+                {importBusy ? 'Importing…' : 'Import'}
+              </button>
+              <button type="button" onClick={() => { setShowImport(false); setImportResult(null); }} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm">
+                Cancel
+              </button>
+            </div>
+            {importResult && (
+              <div className="mt-3 p-3 rounded-lg bg-slate-900/60 border border-white/10 text-xs">
+                <p className="text-white">
+                  ✓ {importResult.created} created · ✗ {importResult.failed} failed (of {importResult.total})
+                </p>
+                {importResult.results.filter((r: any) => !r.ok).slice(0, 5).map((r: any) => (
+                  <p key={r.row} className="text-red-300">Row {r.row}: {r.error}</p>
+                ))}
+              </div>
+            )}
+          </form>
+        )}
 
         {error && (
           <div className="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-200 text-sm">
@@ -385,6 +457,15 @@ function WorkersPageInner() {
                           </button>
                         )}
                         <FaceEnrollButton kind="worker" id={w.id} label="Face" />
+                        {w.qrCodeToken && (
+                          <button
+                            onClick={() => setQrFor(w)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-indigo-600/80 hover:bg-indigo-600 text-white"
+                            title="Show worker QR badge"
+                          >
+                            <QrCode className="w-3.5 h-3.5" /> QR
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -394,6 +475,35 @@ function WorkersPageInner() {
           )}
         </div>
       </div>
+
+      {qrFor && qrFor.qrCodeToken && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setQrFor(null); }}
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900 p-6">
+            <h3 className="text-lg font-semibold text-white">{qrFor.fullName}</h3>
+            <p className="text-xs text-zinc-400 mb-4">
+              {qrFor.skillCategory} · {qrFor.contractor?.companyName}
+            </p>
+            <div className="bg-white rounded-xl p-5 flex items-center justify-center">
+              <QRCodeSVG value={qrFor.qrCodeToken} size={240} level="M" includeMargin />
+            </div>
+            <p className="text-xs font-mono text-zinc-400 mt-3 text-center break-all">
+              {qrFor.qrCodeToken}
+            </p>
+            <p className="text-xs text-zinc-500 mt-2 text-center">
+              Print and stick on the worker's hard-hat. Scan at the gate to toggle in/out.
+            </p>
+            <button
+              onClick={() => setQrFor(null)}
+              className="mt-4 w-full px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-white text-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

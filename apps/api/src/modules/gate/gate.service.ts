@@ -87,6 +87,78 @@ export class GateService {
     };
   }
 
+  /**
+   * Worker check-in/out by their permanent QR token. Public surface
+   * for the kiosk + mobile to scan a worker badge. Idempotent toggle:
+   * if worker is currently on-site, it checks them out; otherwise in.
+   */
+  async workerQrToggle(token: string, gateId = 'kiosk', branchId?: string) {
+    if (!token) throw new BadRequestException('Token required');
+    const worker = await prisma.worker.findUnique({
+      where: { qrCodeToken: token },
+      include: { contractor: { select: { companyName: true } } },
+    });
+    if (!worker) throw new NotFoundException('Unknown worker QR');
+    if (!worker.isActive) throw new BadRequestException('Worker is inactive');
+
+    const open = await prisma.attendance.findFirst({
+      where: { workerId: worker.id, checkOut: null },
+    });
+
+    if (open) {
+      const updated = await prisma.attendance.update({
+        where: { id: open.id },
+        data: { checkOut: new Date() },
+      });
+      this.headcount.broadcastHeadcountUpdate().catch(() => {});
+      this.headcount.broadcastNotification({
+        kind: 'check-out',
+        title: `${worker.fullName} checked out`,
+        body: `Skill: ${worker.skillCategory}`,
+      });
+      return {
+        action: 'checked-out',
+        workerName: worker.fullName,
+        contractor: worker.contractor.companyName,
+        checkedInAt: updated.checkIn,
+        checkedOutAt: updated.checkOut,
+      };
+    }
+
+    // Compliance gate
+    if (!worker.policeVerified) {
+      throw new BadRequestException('Worker is not police-verified yet');
+    }
+    if (new Date(worker.medicalExpiry) < new Date()) {
+      throw new BadRequestException('Worker medical certificate has expired');
+    }
+
+    const chosenBranch = branchId ?? (await prisma.branch.findFirst())?.id;
+    if (!chosenBranch) throw new BadRequestException('No branch available');
+
+    const att = await prisma.attendance.create({
+      data: {
+        workerId: worker.id,
+        branchId: chosenBranch,
+        gateId,
+        checkIn: new Date(),
+      },
+    });
+    this.headcount.broadcastHeadcountUpdate().catch(() => {});
+    this.headcount.broadcastNotification({
+      kind: 'check-in',
+      title: `${worker.fullName} checked in`,
+      body: `Skill: ${worker.skillCategory}`,
+    });
+    return {
+      action: 'checked-in',
+      workerName: worker.fullName,
+      contractor: worker.contractor.companyName,
+      attendanceId: att.id,
+      checkedInAt: att.checkIn,
+    };
+  }
+
   /** Mark a worker as leaving (close open Attendance). */
   async workerCheckOut(user: JwtUser, workerId: string) {
     if (!workerId) throw new BadRequestException('workerId is required');
@@ -200,7 +272,14 @@ export class GateService {
       include: { visitor: true },
     });
 
-    if (!visit) throw new NotFoundException('Invalid QR token');
+    if (!visit) {
+      // Maybe it's a worker badge QR — try that route before failing
+      const worker = await prisma.worker.findUnique({ where: { qrCodeToken } });
+      if (worker) {
+        return this.workerQrToggle(qrCodeToken);
+      }
+      throw new NotFoundException('Invalid QR token');
+    }
 
     // Blacklist check — visitor record OR visit status
     if (visit.visitor.isBlacklisted) {

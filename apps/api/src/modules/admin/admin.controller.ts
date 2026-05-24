@@ -85,6 +85,12 @@ export class AdminController {
     return this.admin.createWorker(user, body);
   }
 
+  @Post('workers/bulk-import')
+  @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER, Role.CONTRACTOR_SUPERVISOR)
+  bulkImportWorkers(@CurrentUser() user: JwtUser, @Body() body: { csv: string }) {
+    return this.admin.bulkImportWorkers(user, body?.csv ?? '');
+  }
+
   @Post('hosts')
   @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN)
   createHost(@CurrentUser() user: JwtUser, @Body() body: any) {
