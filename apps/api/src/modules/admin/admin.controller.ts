@@ -49,6 +49,17 @@ export class AdminController {
     return this.admin.listAuditLogs(user);
   }
 
+  @Get('anomalies')
+  anomalies(@CurrentUser() user: JwtUser) {
+    return this.admin.detectAnomalies(user);
+  }
+
+  @Get('heatmap')
+  heatmap(@CurrentUser() user: JwtUser, @Query('days') days?: string) {
+    const d = days ? parseInt(days, 10) : 30;
+    return this.admin.getHeatmap(user, Number.isFinite(d) ? d : 30);
+  }
+
   // --- Writes: scoped + role-checked -----------------------------
   @Post('contractors')
   @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER)

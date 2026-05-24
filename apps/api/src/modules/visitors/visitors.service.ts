@@ -90,7 +90,7 @@ export class VisitorsService {
     const visit = await prisma.visit.findUnique({
       where: { id },
       include: {
-        visitor: { select: { fullName: true, company: true, phone: true } },
+        visitor: { select: { id: true, fullName: true, company: true, phone: true } },
         host: { select: { fullName: true, email: true } },
         branch: { select: { name: true, location: true } },
       },
@@ -98,6 +98,7 @@ export class VisitorsService {
     if (!visit) return null;
     return {
       visitId: visit.id,
+      visitorId: visit.visitor.id,
       qrCodeToken: visit.qrCodeToken,
       status: visit.status,
       purpose: visit.purpose,

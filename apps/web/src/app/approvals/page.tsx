@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
-import { CheckCircle, XCircle, Hourglass, Building2, User, Car } from 'lucide-react';
+import { CheckCircle, XCircle, Hourglass, Building2, User, Car, CheckSquare, Square } from 'lucide-react';
 import { apiGet, apiPut } from '@/lib/api';
+import { VisitorAvatar } from '@/components/visitor-avatar';
 
 interface PendingVisit {
   id: string;
@@ -13,7 +14,7 @@ interface PendingVisit {
   expectedEntry: string;
   vehicleNumber: string | null;
   qrCodeToken: string;
-  visitor: { fullName: string; phone: string; company: string | null };
+  visitor: { id: string; fullName: string; phone: string; company: string | null };
   host: { fullName: string; email: string };
   branch: { name: string; location: string };
 }
@@ -24,6 +25,8 @@ export default function ApprovalsPage() {
   const [pending, setPending] = useState<PendingVisit[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) router.push('/auth/login');
@@ -56,6 +59,35 @@ export default function ApprovalsPage() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function selectAll() {
+    if (!pending) return;
+    setSelected(
+      selected.size === pending.length ? new Set() : new Set(pending.map((p) => p.id)),
+    );
+  }
+
+  async function bulkDecide(status: 'APPROVED' | 'REJECTED') {
+    if (selected.size === 0) return;
+    setBulkBusy(true);
+    setError(null);
+    const results = await Promise.allSettled(
+      Array.from(selected).map((id) => apiPut(`/visitors/visit/${id}/status`, { status })),
+    );
+    const failed = results.filter((r) => r.status === 'rejected').length;
+    if (failed > 0) setError(`${failed} of ${selected.size} failed to update`);
+    setSelected(new Set());
+    setBulkBusy(false);
+    await load();
   }
 
   if (isLoading || !isAuthenticated) {
@@ -101,23 +133,73 @@ export default function ApprovalsPage() {
           </div>
         )}
 
+        {pending && pending.length > 0 && (
+          <div className="mb-4 flex items-center gap-3 flex-wrap p-3 rounded-xl border border-white/10 bg-white/5">
+            <button
+              onClick={selectAll}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-300 hover:text-white"
+            >
+              {selected.size === pending.length ? (
+                <CheckSquare className="w-4 h-4 text-blue-400" />
+              ) : (
+                <Square className="w-4 h-4" />
+              )}
+              {selected.size === pending.length ? 'Deselect all' : 'Select all'}
+            </button>
+            <span className="text-xs text-zinc-500">
+              {selected.size} selected
+            </span>
+            <div className="ml-auto flex gap-2">
+              <button
+                disabled={bulkBusy || selected.size === 0}
+                onClick={() => bulkDecide('APPROVED')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white text-xs font-medium"
+              >
+                <CheckCircle className="w-3.5 h-3.5" /> Approve selected
+              </button>
+              <button
+                disabled={bulkBusy || selected.size === 0}
+                onClick={() => bulkDecide('REJECTED')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-red-600/80 hover:bg-red-600 disabled:opacity-40 text-white text-xs font-medium"
+              >
+                <XCircle className="w-3.5 h-3.5" /> Reject selected
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4">
           {pending?.map((v) => (
             <div
               key={v.id}
-              className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-6 backdrop-blur-xl"
+              className={`rounded-2xl border p-6 backdrop-blur-xl transition-colors ${
+                selected.has(v.id)
+                  ? 'border-blue-500/40 bg-blue-500/10'
+                  : 'border-yellow-500/20 bg-yellow-500/5'
+              }`}
             >
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
-                <div>
-                  <p className="text-xs text-zinc-400 uppercase mb-1 flex items-center gap-1">
-                    <User className="w-3 h-3" /> Visitor
-                  </p>
+              <div className="flex items-start gap-4 mb-4">
+                <button
+                  onClick={() => toggleSelect(v.id)}
+                  className="mt-1 shrink-0 text-zinc-400 hover:text-blue-400"
+                  title="Select for bulk action"
+                >
+                  {selected.has(v.id) ? (
+                    <CheckSquare className="w-5 h-5 text-blue-400" />
+                  ) : (
+                    <Square className="w-5 h-5" />
+                  )}
+                </button>
+                <VisitorAvatar visitorId={v.visitor.id} name={v.visitor.fullName} size={56} />
+                <div className="flex-1 min-w-0">
                   <p className="font-semibold text-white">{v.visitor.fullName}</p>
                   <p className="text-xs text-zinc-400">{v.visitor.phone}</p>
                   {v.visitor.company && (
                     <p className="text-xs text-zinc-400">{v.visitor.company}</p>
                   )}
                 </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                 <div>
                   <p className="text-xs text-zinc-400 uppercase mb-1">Host</p>
                   <p className="font-semibold text-white">{v.host.fullName}</p>

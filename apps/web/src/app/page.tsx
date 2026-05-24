@@ -9,6 +9,8 @@ import { ComplianceStatus } from "@/components/dashboard/ComplianceStatus";
 import { BranchFilter } from "@/components/dashboard/BranchFilter";
 import { ComplianceAlerts } from "@/components/dashboard/ComplianceAlerts";
 import { VisitsChart } from "@/components/dashboard/VisitsChart";
+import { VisitsHeatmap } from "@/components/dashboard/VisitsHeatmap";
+import { AnomaliesBanner } from "@/components/dashboard/AnomaliesBanner";
 import { DashboardHeader } from "@/components/dashboard-header";
 
 export default function DashboardPage() {
@@ -51,9 +53,11 @@ export default function DashboardPage() {
         </div>
 
         <ComplianceAlerts />
+        <AnomaliesBanner />
 
-        <div className="mt-8">
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
           <VisitsChart />
+          <VisitsHeatmap />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8 pb-12">

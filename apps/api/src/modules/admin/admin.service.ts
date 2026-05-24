@@ -96,6 +96,176 @@ export class AdminService {
     });
   }
 
+  /**
+   * Rule-based anomaly detection. Not ML, but actually useful: flags
+   * frequency spikes, after-hours entries, repeated rejections, expired
+   * compliance attempts. Scoped to user's org.
+   */
+  async detectAnomalies(user: JwtUser) {
+    const now = new Date();
+    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const visitWhere = isSuperAdmin(user)
+      ? {}
+      : { branch: { organizationId: requireOrg(user) } };
+
+    const anomalies: Array<{
+      id: string;
+      severity: 'LOW' | 'MEDIUM' | 'HIGH';
+      kind: string;
+      title: string;
+      detail: string;
+      visitId?: string;
+      visitorId?: string;
+      occurredAt?: string;
+    }> = [];
+
+    // (1) Visitors with 3+ visits in last 24h
+    const recent = await prisma.visit.findMany({
+      where: { createdAt: { gte: last24h }, ...visitWhere },
+      select: { id: true, visitorId: true, visitor: { select: { fullName: true, phone: true } } },
+    });
+    const perVisitor = new Map<string, { name: string; phone: string; count: number }>();
+    for (const v of recent) {
+      const cur = perVisitor.get(v.visitorId) || { name: v.visitor.fullName, phone: v.visitor.phone, count: 0 };
+      cur.count += 1;
+      perVisitor.set(v.visitorId, cur);
+    }
+    for (const [vid, info] of perVisitor) {
+      if (info.count >= 3) {
+        anomalies.push({
+          id: `freq-${vid}`,
+          severity: info.count >= 5 ? 'HIGH' : 'MEDIUM',
+          kind: 'frequency',
+          title: `${info.name} visited ${info.count}x in 24h`,
+          detail: `Phone ${info.phone}. Unusual visit frequency.`,
+          visitorId: vid,
+        });
+      }
+    }
+
+    // (2) After-hours check-ins (before 06:00 or after 22:00 local UTC)
+    const afterHours = await prisma.visit.findMany({
+      where: {
+        actualEntry: { gte: last7d },
+        ...visitWhere,
+      },
+      select: { id: true, actualEntry: true, visitor: { select: { fullName: true } } },
+    });
+    for (const v of afterHours) {
+      if (!v.actualEntry) continue;
+      const h = new Date(v.actualEntry).getUTCHours();
+      if (h < 6 || h >= 22) {
+        anomalies.push({
+          id: `afterhours-${v.id}`,
+          severity: 'MEDIUM',
+          kind: 'after-hours',
+          title: `${v.visitor.fullName} checked in at ${String(h).padStart(2, '0')}:00 UTC`,
+          detail: 'Entry outside 06:00–22:00 window.',
+          visitId: v.id,
+          occurredAt: v.actualEntry.toISOString(),
+        });
+      }
+    }
+
+    // (3) Repeated rejections from same phone (>=2 in 7d)
+    const rejected = await prisma.visit.findMany({
+      where: {
+        status: 'REJECTED',
+        updatedAt: { gte: last7d },
+        ...visitWhere,
+      },
+      select: { id: true, visitorId: true, visitor: { select: { fullName: true, phone: true } } },
+    });
+    const rejectCount = new Map<string, { name: string; phone: string; count: number }>();
+    for (const v of rejected) {
+      const cur = rejectCount.get(v.visitorId) || { name: v.visitor.fullName, phone: v.visitor.phone, count: 0 };
+      cur.count += 1;
+      rejectCount.set(v.visitorId, cur);
+    }
+    for (const [vid, info] of rejectCount) {
+      if (info.count >= 2) {
+        anomalies.push({
+          id: `repeat-reject-${vid}`,
+          severity: 'HIGH',
+          kind: 'repeat-rejection',
+          title: `${info.name} rejected ${info.count}x in 7d`,
+          detail: `Phone ${info.phone}. Consider blacklisting.`,
+          visitorId: vid,
+        });
+      }
+    }
+
+    // (4) Blacklisted visitor attempted entry (any blacklisted visitor with a visit in last 7d)
+    const blacklistedAttempts = await prisma.visit.findMany({
+      where: {
+        createdAt: { gte: last7d },
+        visitor: { isBlacklisted: true },
+        ...visitWhere,
+      },
+      select: { id: true, visitor: { select: { fullName: true } }, createdAt: true },
+    });
+    for (const v of blacklistedAttempts) {
+      anomalies.push({
+        id: `blacklist-${v.id}`,
+        severity: 'HIGH',
+        kind: 'blacklist-attempt',
+        title: `Blacklisted visitor ${v.visitor.fullName} created a visit`,
+        detail: 'Gate will refuse entry, but the attempt was logged.',
+        visitId: v.id,
+        occurredAt: v.createdAt.toISOString(),
+      });
+    }
+
+    // Sort: HIGH → MEDIUM → LOW
+    const rank: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+    anomalies.sort((a, b) => rank[a.severity] - rank[b.severity]);
+
+    return {
+      generatedAt: now.toISOString(),
+      total: anomalies.length,
+      bySeverity: {
+        HIGH: anomalies.filter((a) => a.severity === 'HIGH').length,
+        MEDIUM: anomalies.filter((a) => a.severity === 'MEDIUM').length,
+        LOW: anomalies.filter((a) => a.severity === 'LOW').length,
+      },
+      anomalies: anomalies.slice(0, 50),
+    };
+  }
+
+  /**
+   * Visits per hour-of-day × day-of-week heatmap over the last `days`.
+   * Returns an array of { dow: 0..6 (Sun..Sat), hour: 0..23, count }.
+   */
+  async getHeatmap(user: JwtUser, days = 30) {
+    const cap = Math.min(Math.max(days, 7), 90);
+    const since = new Date();
+    since.setUTCHours(0, 0, 0, 0);
+    since.setUTCDate(since.getUTCDate() - cap);
+
+    const visits = await prisma.visit.findMany({
+      where: { createdAt: { gte: since }, ...(isSuperAdmin(user) ? {} : { branch: { organizationId: requireOrg(user) } }) },
+      select: { createdAt: true },
+    });
+
+    const grid: Record<string, number> = {};
+    for (const v of visits) {
+      const d = new Date(v.createdAt);
+      const dow = d.getUTCDay();
+      const hour = d.getUTCHours();
+      const key = `${dow}-${hour}`;
+      grid[key] = (grid[key] ?? 0) + 1;
+    }
+
+    const out: Array<{ dow: number; hour: number; count: number }> = [];
+    for (let dow = 0; dow < 7; dow++) {
+      for (let hour = 0; hour < 24; hour++) {
+        out.push({ dow, hour, count: grid[`${dow}-${hour}`] ?? 0 });
+      }
+    }
+    return { days: cap, cells: out };
+  }
+
   // Audit log — SUPER_ADMIN sees all; ORG_ADMIN sees entries by actors in their org.
   async listAuditLogs(user: JwtUser, limit = 200) {
     if (isSuperAdmin(user)) {

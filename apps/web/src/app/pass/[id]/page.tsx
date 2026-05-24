@@ -15,6 +15,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { API_URL } from '@/lib/api';
+import { VisitorAvatar } from '@/components/visitor-avatar';
 
 interface PassData {
   visitId: string;
@@ -25,6 +26,7 @@ interface PassData {
   actualEntry: string | null;
   actualExit: string | null;
   vehicleNumber: string | null;
+  visitorId?: string;
   visitor: { fullName: string; company: string | null; phone: string };
   host: { fullName: string; email: string };
   branch: { name: string; location: string };
@@ -111,14 +113,17 @@ export default function PassPage({ params }: { params: Promise<{ id: string }> }
             </div>
           </div>
 
-          {/* QR */}
-          <div className="p-6">
+          {/* Photo + QR */}
+          <div className="p-6 flex flex-col items-center gap-4">
+            {pass.visitorId && (
+              <VisitorAvatar visitorId={pass.visitorId} name={pass.visitor.fullName} />
+            )}
             {showQR ? (
               <div className="bg-white rounded-2xl p-5 flex items-center justify-center mx-auto" style={{ width: 'fit-content' }}>
-                <QRCodeSVG value={pass.qrCodeToken} size={220} level="M" includeMargin />
+                <QRCodeSVG value={pass.qrCodeToken} size={200} level="M" includeMargin />
               </div>
             ) : (
-              <div className="rounded-2xl border-2 border-dashed border-white/10 p-10 text-center text-zinc-500">
+              <div className="rounded-2xl border-2 border-dashed border-white/10 p-10 text-center text-zinc-500 w-full">
                 <p className="text-sm">QR code appears once your host approves the visit.</p>
                 <p className="text-xs mt-2 font-mono">{pass.qrCodeToken}</p>
               </div>
