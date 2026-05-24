@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
-import { Plus, ShieldCheck, ShieldOff, HardHat } from 'lucide-react';
+import { Plus, ShieldCheck, ShieldOff, HardHat, LogIn, LogOut } from 'lucide-react';
 import { apiGet, apiPost } from '@/lib/api';
 
 export default function WorkersPage() {
@@ -47,9 +47,11 @@ function WorkersPageInner() {
 
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [workers, setWorkers] = useState<Worker[] | null>(null);
+  const [openAttendance, setOpenAttendance] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     contractorId: contractorFilter,
@@ -78,7 +80,16 @@ function WorkersPageInner() {
       const path = contractorFilter
         ? `/admin/workers?contractorId=${encodeURIComponent(contractorFilter)}`
         : '/admin/workers';
-      setWorkers(await apiGet<Worker[]>(path));
+      const [ws, atts] = await Promise.all([
+        apiGet<Worker[]>(path),
+        apiGet<any[]>('/admin/attendance').catch(() => []),
+      ]);
+      setWorkers(ws);
+      const open: Record<string, string> = {};
+      for (const a of atts) {
+        if (a.checkOut === null) open[a.workerId] = a.id;
+      }
+      setOpenAttendance(open);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load workers');
     }
@@ -87,6 +98,22 @@ function WorkersPageInner() {
   useEffect(() => {
     if (isAuthenticated) loadWorkers();
   }, [isAuthenticated, contractorFilter]);
+
+  async function toggleAttendance(w: Worker) {
+    setBusyId(w.id);
+    setError('');
+    try {
+      const path = openAttendance[w.id] ? '/gate/worker-check-out' : '/gate/worker-check-in';
+      const body: any = { workerId: w.id };
+      if (!openAttendance[w.id]) body.gateId = 'web-gate-1';
+      await apiPost(path, body);
+      await loadWorkers();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Action failed');
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -266,6 +293,7 @@ function WorkersPageInner() {
                   <th className="text-left p-4">Skill</th>
                   <th className="text-left p-4">Medical</th>
                   <th className="text-left p-4">Police</th>
+                  <th className="text-left p-4">On site</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -299,6 +327,27 @@ function WorkersPageInner() {
                         <ShieldCheck className="w-5 h-5 text-green-500" />
                       ) : (
                         <ShieldOff className="w-5 h-5 text-red-500" />
+                      )}
+                    </td>
+                    <td className="p-4">
+                      {openAttendance[w.id] ? (
+                        <button
+                          onClick={() => toggleAttendance(w)}
+                          disabled={busyId === w.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-zinc-500/15 hover:bg-zinc-500/25 text-zinc-200 text-xs font-medium disabled:opacity-50"
+                          title="Check out"
+                        >
+                          <LogOut className="w-3.5 h-3.5" /> On site · check out
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => toggleAttendance(w)}
+                          disabled={busyId === w.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-green-600/80 hover:bg-green-600 text-white text-xs font-medium disabled:opacity-50"
+                          title="Mark on site"
+                        >
+                          <LogIn className="w-3.5 h-3.5" /> Mark on site
+                        </button>
                       )}
                     </td>
                   </tr>

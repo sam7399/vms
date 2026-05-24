@@ -4,7 +4,16 @@ import { StatusBar } from "expo-status-bar";
 import { LoginScreen } from "./screens/LoginScreen";
 import { CheckInScreen } from "./screens/CheckInScreen";
 import { ApprovalsScreen } from "./screens/ApprovalsScreen";
+import { WorkersScreen } from "./screens/WorkersScreen";
 import { clearSession, getUser, SessionUser } from "./api";
+
+const WORKER_ROLES = new Set([
+  "SUPER_ADMIN",
+  "ORG_ADMIN",
+  "HR_MANAGER",
+  "SECURITY_GUARD",
+  "CONTRACTOR_SUPERVISOR",
+]);
 
 type AuthState =
   | { kind: "loading" }
@@ -12,7 +21,7 @@ type AuthState =
   | { kind: "gate" }          // Skipped login — check-in only
   | { kind: "authed"; user: SessionUser };
 
-type Tab = "checkin" | "approvals";
+type Tab = "checkin" | "approvals" | "workers";
 
 export default function App() {
   const [auth, setAuth] = useState<AuthState>({ kind: "loading" });
@@ -68,15 +77,14 @@ export default function App() {
   }
 
   // authed
+  const showWorkers = WORKER_ROLES.has(auth.user.role);
   return (
     <>
       <StatusBar style="light" />
       <View style={styles.flex}>
-        {tab === "checkin" ? (
-          <CheckInScreen />
-        ) : (
-          <ApprovalsScreen user={auth.user} />
-        )}
+        {tab === "checkin" && <CheckInScreen />}
+        {tab === "approvals" && <ApprovalsScreen user={auth.user} />}
+        {tab === "workers" && showWorkers && <WorkersScreen user={auth.user} />}
         <View style={styles.tabBar}>
           <TabButton
             label="Check-in"
@@ -88,6 +96,13 @@ export default function App() {
             active={tab === "approvals"}
             onPress={() => setTab("approvals")}
           />
+          {showWorkers && (
+            <TabButton
+              label="Workers"
+              active={tab === "workers"}
+              onPress={() => setTab("workers")}
+            />
+          )}
           <TabButton
             label="Sign out"
             onPress={async () => {

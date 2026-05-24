@@ -57,7 +57,13 @@ export class AdminController {
   }
 
   @Post('workers')
-  @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER, Role.CONTRACTOR_SUPERVISOR)
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.ORG_ADMIN,
+    Role.HR_MANAGER,
+    Role.CONTRACTOR_SUPERVISOR,
+    Role.SECURITY_GUARD,
+  )
   createWorker(@CurrentUser() user: JwtUser, @Body() body: any) {
     return this.admin.createWorker(user, body);
   }

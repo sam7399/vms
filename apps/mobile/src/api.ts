@@ -81,4 +81,26 @@ export const api = {
       method: "PUT",
       body: { status },
     }),
+
+  // Workers (security guard / contractor supervisor)
+  listContractors: () => request<any[]>("/admin/contractors"),
+  listWorkers: (contractorId?: string) =>
+    request<any[]>(
+      contractorId
+        ? `/admin/workers?contractorId=${encodeURIComponent(contractorId)}`
+        : "/admin/workers",
+    ),
+  listAttendance: () => request<any[]>("/admin/attendance"),
+  createWorker: (data: any) =>
+    request<any>("/admin/workers", { method: "POST", body: data }),
+  workerCheckIn: (workerId: string, gateId: string) =>
+    request<any>("/gate/worker-check-in", {
+      method: "POST",
+      body: { workerId, gateId },
+    }),
+  workerCheckOut: (workerId: string) =>
+    request<any>("/gate/worker-check-out", {
+      method: "POST",
+      body: { workerId },
+    }),
 };
