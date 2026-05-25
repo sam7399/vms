@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../platform/prisma/prisma.service';
-import { HeadcountGateway } from '../../gateways/headcount.gateway';
+import { EventBus } from '../../platform/events/event-bus';
 import { NotificationsService } from '../notifications/notifications.service';
 import { JwtUser, isSuperAdmin } from '../../common/tenant';
 
@@ -9,7 +9,7 @@ const LEVELS = new Set(['info', 'warning', 'urgent']);
 @Injectable()
 export class NoticesService {
   constructor(
-    private readonly headcount: HeadcountGateway,
+    private readonly events: EventBus,
     private readonly notifications: NotificationsService,
     private readonly prisma: PrismaService,
   ) {}
@@ -86,8 +86,7 @@ export class NoticesService {
       },
     });
 
-    // Real-time broadcast to dashboards
-    this.headcount.broadcastNotice(notice);
+    this.events.emit('notice.posted', { notice });
 
     // Mobile push to everyone affected
     this.notifications
@@ -113,7 +112,7 @@ export class NoticesService {
       }
     }
     await this.prisma.notice.delete({ where: { id } });
-    this.headcount.broadcastNoticeRemoved(id);
+    this.events.emit('notice.removed', { id });
     return { ok: true };
   }
 }

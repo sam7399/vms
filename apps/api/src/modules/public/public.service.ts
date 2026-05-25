@@ -2,14 +2,14 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { DocumentType, VisitStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../platform/prisma/prisma.service';
+import { EventBus } from '../../platform/events/event-bus';
 import { NotificationsService } from '../notifications/notifications.service';
-import { HeadcountGateway } from '../../gateways/headcount.gateway';
 
 @Injectable()
 export class PublicService {
   constructor(
     private readonly notifications: NotificationsService,
-    private readonly headcount: HeadcountGateway,
+    private readonly events: EventBus,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -162,12 +162,13 @@ export class PublicService {
         .catch(() => {});
     }
 
-    // Real-time push to all connected dashboards
-    this.headcount.broadcastNotification({
-      kind: 'walk-in',
-      title: `${visit.visitor.fullName} just walked in`,
-      body: `${data.purpose} · host ${visit.host.fullName}`,
+    this.events.emit('visit.walked_in', {
       visitId: visit.id,
+      branchId: data.branchId,
+      visitorName: visit.visitor.fullName,
+      hostName: visit.host.fullName,
+      purpose: data.purpose,
+      ts: new Date().toISOString(),
     });
 
     // Expo push to every device in the branch (host's mobile phone)

@@ -1,7 +1,7 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { HeadcountGateway } from '../../gateways/headcount.gateway';
+import { EventBus } from '../../platform/events/event-bus';
 import { PrismaService } from '../../platform/prisma/prisma.service';
 import type { JwtUser } from '../../common/tenant';
 
@@ -9,7 +9,7 @@ import type { JwtUser } from '../../common/tenant';
 @UseGuards(JwtAuthGuard)
 export class SosController {
   constructor(
-    private readonly headcount: HeadcountGateway,
+    private readonly events: EventBus,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -17,20 +17,23 @@ export class SosController {
   async trigger(@CurrentUser() user: JwtUser, @Body() body: { message?: string }) {
     const me = await this.prisma.user.findUnique({
       where: { id: user.userId },
-      select: { fullName: true, email: true, branch: { select: { name: true } } },
+      select: { fullName: true, email: true, branchId: true, branch: { select: { name: true } } },
     });
-    this.headcount.broadcastSos({
+    this.events.emit('sos.triggered', {
+      actorId: user.userId,
       actorEmail: me?.email ?? user.email,
       actorName: me?.fullName ?? user.email,
+      branchId: me?.branchId,
       branchName: me?.branch?.name,
       message: body?.message?.slice(0, 200),
+      ts: new Date().toISOString(),
     });
     return { ok: true };
   }
 
   @Post('clear')
-  async clear() {
-    this.headcount.broadcastSosClear();
+  async clear(@CurrentUser() user: JwtUser) {
+    this.events.emit('sos.cleared', { actorId: user.userId, ts: new Date().toISOString() });
     return { ok: true };
   }
 }

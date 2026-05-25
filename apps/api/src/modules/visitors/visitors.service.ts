@@ -2,7 +2,7 @@ import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/com
 import { VisitStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../platform/prisma/prisma.service';
-import { HeadcountGateway } from '../../gateways/headcount.gateway';
+import { EventBus } from '../../platform/events/event-bus';
 import { NotificationsService } from '../notifications/notifications.service';
 import { JwtUser, isSuperAdmin, visitScope } from '../../common/tenant';
 
@@ -22,7 +22,7 @@ function parsePhotoBase64(input?: string | null): Buffer | undefined {
 @Injectable()
 export class VisitorsService {
   constructor(
-    private readonly headcount: HeadcountGateway,
+    private readonly events: EventBus,
     private readonly notifications: NotificationsService,
     private readonly prisma: PrismaService,
   ) {}
@@ -226,11 +226,14 @@ export class VisitorsService {
 
     // Real-time push to dashboards + mobile devices
     if (status === 'APPROVED' || status === 'REJECTED') {
-      this.headcount.broadcastNotification({
-        kind: 'approval',
-        title: `${updated.visitor.fullName} ${status.toLowerCase()}`,
-        body: `Host: ${updated.host.fullName}`,
+      this.events.emit('visit.decided', {
         visitId: updated.id,
+        branchId: updated.branchId,
+        visitorName: updated.visitor.fullName,
+        hostName: updated.host.fullName,
+        status: status as 'APPROVED' | 'REJECTED',
+        visitorEmail: updated.visitor.email,
+        ts: new Date().toISOString(),
       });
       this.notifications
         .pushToDevices({
@@ -315,8 +318,17 @@ export class VisitorsService {
     const v = await this.prisma.visit.update({
       where: { id: visitId },
       data: { status: VisitStatus.CHECKED_IN, actualEntry: new Date() },
+      include: { visitor: { select: { fullName: true } } },
     });
-    this.headcount.broadcastHeadcountUpdate().catch(() => {});
+    const ts = new Date().toISOString();
+    this.events.emit('visit.checked_in', {
+      branchId: v.branchId,
+      kind: 'visitor',
+      actorId: v.visitorId,
+      actorName: v.visitor.fullName,
+      ts,
+    });
+    this.events.emit('headcount.invalidated', { branchId: v.branchId, reason: 'visit.checked_in', ts });
     return v;
   }
 
@@ -325,8 +337,17 @@ export class VisitorsService {
     const v = await this.prisma.visit.update({
       where: { id: visitId },
       data: { status: VisitStatus.CHECKED_OUT, actualExit: new Date() },
+      include: { visitor: { select: { fullName: true } } },
     });
-    this.headcount.broadcastHeadcountUpdate().catch(() => {});
+    const ts = new Date().toISOString();
+    this.events.emit('visit.checked_out', {
+      branchId: v.branchId,
+      kind: 'visitor',
+      actorId: v.visitorId,
+      actorName: v.visitor.fullName,
+      ts,
+    });
+    this.events.emit('headcount.invalidated', { branchId: v.branchId, reason: 'visit.checked_out', ts });
     return v;
   }
 

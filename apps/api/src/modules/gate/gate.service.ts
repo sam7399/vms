@@ -5,16 +5,28 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { VisitStatus } from '@prisma/client';
-import { HeadcountGateway } from '../../gateways/headcount.gateway';
 import { PrismaService } from '../../platform/prisma/prisma.service';
+import { EventBus } from '../../platform/events/event-bus';
 import { JwtUser, isSuperAdmin, workerScope } from '../../common/tenant';
 
 @Injectable()
 export class GateService {
   constructor(
-    private readonly headcount: HeadcountGateway,
+    private readonly events: EventBus,
     private readonly prisma: PrismaService,
   ) {}
+
+  private emitWorkerEvent(kind: 'in' | 'out', branchId: string, workerId: string, workerName: string) {
+    const ts = new Date().toISOString();
+    this.events.emit(kind === 'in' ? 'worker.checked_in' : 'worker.checked_out', {
+      branchId,
+      kind: 'worker',
+      actorId: workerId,
+      actorName: workerName,
+      ts,
+    });
+    this.events.emit('headcount.invalidated', { branchId, reason: `worker.checked_${kind}`, ts });
+  }
 
   /** Mark a worker on-site (creates Attendance if not already open). */
   async workerCheckIn(
@@ -73,12 +85,7 @@ export class GateService {
       },
     });
 
-    this.headcount.broadcastHeadcountUpdate().catch(() => {});
-    this.headcount.broadcastNotification({
-      kind: 'check-in',
-      title: `${worker.fullName} checked in`,
-      body: `Skill: ${worker.skillCategory}`,
-    });
+    this.emitWorkerEvent('in', branchId, worker.id, worker.fullName);
 
     return {
       success: true,
@@ -112,12 +119,7 @@ export class GateService {
         where: { id: open.id },
         data: { checkOut: new Date() },
       });
-      this.headcount.broadcastHeadcountUpdate().catch(() => {});
-      this.headcount.broadcastNotification({
-        kind: 'check-out',
-        title: `${worker.fullName} checked out`,
-        body: `Skill: ${worker.skillCategory}`,
-      });
+      this.emitWorkerEvent('out', updated.branchId, worker.id, worker.fullName);
       return {
         action: 'checked-out',
         workerName: worker.fullName,
@@ -146,12 +148,7 @@ export class GateService {
         checkIn: new Date(),
       },
     });
-    this.headcount.broadcastHeadcountUpdate().catch(() => {});
-    this.headcount.broadcastNotification({
-      kind: 'check-in',
-      title: `${worker.fullName} checked in`,
-      body: `Skill: ${worker.skillCategory}`,
-    });
+    this.emitWorkerEvent('in', chosenBranch, worker.id, worker.fullName);
     return {
       action: 'checked-in',
       workerName: worker.fullName,
@@ -184,11 +181,7 @@ export class GateService {
       data: { checkOut: new Date() },
     });
 
-    this.headcount.broadcastHeadcountUpdate().catch(() => {});
-    this.headcount.broadcastNotification({
-      kind: 'check-out',
-      title: `${worker.fullName} checked out`,
-    });
+    this.emitWorkerEvent('out', updated.branchId, worker.id, worker.fullName);
 
     return {
       success: true,
@@ -318,8 +311,15 @@ export class GateService {
       },
     });
 
-    // Fire-and-forget headcount broadcast
-    this.headcount.broadcastHeadcountUpdate().catch(() => {});
+    const ts = new Date().toISOString();
+    this.events.emit('visit.checked_in', {
+      branchId: updated.branchId,
+      kind: 'visitor',
+      actorId: visit.visitorId,
+      actorName: visit.visitor.fullName,
+      ts,
+    });
+    this.events.emit('headcount.invalidated', { branchId: updated.branchId, reason: 'gate.qr_checkin', ts });
 
     return {
       success: true,
