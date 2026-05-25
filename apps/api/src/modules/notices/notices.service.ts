@@ -67,7 +67,7 @@ export class NoticesService {
     }
 
     const me = await prisma.user.findUnique({
-      where: { id: (user as any).id },
+      where: { id: (user as any).userId },
       select: { fullName: true, email: true, branch: { select: { organizationId: true } } },
     });
     if (!isSuperAdmin(user) && me?.branch?.organizationId) {
@@ -82,7 +82,7 @@ export class NoticesService {
         organizationId: orgId,
         branchId: data.branchId || null,
         expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
-        authorId: (user as any).id ?? 'unknown',
+        authorId: (user as any).userId ?? 'unknown',
         authorName: me?.fullName ?? me?.email ?? 'Admin',
       },
     });

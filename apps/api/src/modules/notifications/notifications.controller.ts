@@ -18,7 +18,7 @@ export class NotificationsController {
     return this.svc.registerDeviceToken({
       token: body?.token,
       platform: body?.platform || 'unknown',
-      userId: (user as any).id,
+      userId: (user as any).userId,
       branchId: (user as any).branchId,
       orgId: (user as any).orgId,
     });
