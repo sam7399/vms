@@ -1,15 +1,16 @@
 import { Body, Controller, Get, Header, NotFoundException, Param, Post, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { PublicService } from './public.service';
-
-const prisma = new PrismaClient();
+import { PrismaService } from '../../platform/prisma/prisma.service';
 
 // All routes here are intentionally unguarded — they're consumed by the
 // kiosk and other public terminals. Rate limiter (global) protects them.
 @Controller('public')
 export class PublicController {
-  constructor(private readonly publicService: PublicService) {}
+  constructor(
+    private readonly publicService: PublicService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Get('branches')
   branches() {
@@ -38,7 +39,7 @@ export class PublicController {
    */
   @Get('visitor/:id/photo')
   async visitorPhoto(@Param('id') id: string, @Res() res: Response) {
-    const v = await prisma.visitor.findUnique({
+    const v = await this.prisma.visitor.findUnique({
       where: { id },
       select: { faceData: true },
     });

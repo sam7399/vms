@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { PrismaModule } from './platform/prisma/prisma.module';
+import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { AuthModule } from './modules/auth/auth.module';
 import { VisitorsModule } from './modules/visitors/visitors.module';
 import { GateModule } from './modules/gate/gate.module';
@@ -28,6 +30,7 @@ import { HealthController } from './health.controller';
       { name: 'short', ttl: 1_000, limit: 10 },   // 10 req/sec burst
       { name: 'medium', ttl: 60_000, limit: 120 }, // 120 req/min sustained
     ]),
+    PrismaModule,
     HeadcountModule,
     AuthModule,
     VisitorsModule,
@@ -43,6 +46,9 @@ import { HealthController } from './health.controller';
     NoticesModule,
   ],
   controllers: [HealthController],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
+  ],
 })
 export class AppModule {}

@@ -1,8 +1,7 @@
 import { WebSocketGateway, WebSocketServer, SubscribeMessage, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { PrismaClient, VisitStatus } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { VisitStatus } from '@prisma/client';
+import { PrismaService } from '../platform/prisma/prisma.service';
 
 @WebSocketGateway({
   cors: {
@@ -15,6 +14,8 @@ export class HeadcountGateway implements OnGatewayConnection, OnGatewayDisconnec
   server!: Server;
 
   private connectedClients = new Set<string>();
+
+  constructor(private readonly prisma: PrismaService) {}
 
   async handleConnection(client: Socket) {
     this.connectedClients.add(client.id);
@@ -37,11 +38,11 @@ export class HeadcountGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   private async calculateHeadcount() {
     const [activeVisits, activeWorkers] = await Promise.all([
-      prisma.visit.findMany({
+      this.prisma.visit.findMany({
         where: { status: VisitStatus.CHECKED_IN, actualExit: null },
         select: { id: true, visitor: { select: { company: true } } },
       }),
-      prisma.attendance.count({ where: { checkOut: null } }),
+      this.prisma.attendance.count({ where: { checkOut: null } }),
     ]);
 
     const visitors = activeVisits.filter((v) => v.visitor.company).length;

@@ -2,9 +2,7 @@ import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { PrismaService } from '../../platform/prisma/prisma.service';
 
 // --- Zero-dependency RFC 6238 TOTP (compatible with Google Authenticator) ---
 
@@ -83,10 +81,13 @@ export interface JwtPayload {
 
 @Injectable()
 export class AuthService {
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    private prisma: PrismaService,
+  ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({ where: { email } });
     if (user && await bcrypt.compare(password, user.passwordHash)) {
       const { passwordHash, ...result } = user;
       return result;
@@ -96,7 +97,7 @@ export class AuthService {
 
   async login(user: any) {
     // Resolve org via branch
-    const branch = await prisma.branch.findUnique({
+    const branch = await this.prisma.branch.findUnique({
       where: { id: user.branchId },
       select: { organizationId: true },
     });
@@ -125,7 +126,7 @@ export class AuthService {
   async register(email: string, password: string, fullName: string, branchId: string, role: string = 'EMPLOYEE') {
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await prisma.user.create({
+    const user = await this.prisma.user.create({
       data: {
         email,
         passwordHash: hashedPassword,
@@ -139,13 +140,13 @@ export class AuthService {
   }
 
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error('User not found');
 
     const ok = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!ok) throw new Error('Current password is incorrect');
 
-    await prisma.user.update({
+    await this.prisma.user.update({
       where: { id: userId },
       data: { passwordHash: await bcrypt.hash(newPassword, 10) },
     });
@@ -153,7 +154,7 @@ export class AuthService {
   }
 
   async me(userId: string) {
-    return prisma.user.findUnique({
+    return this.prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
@@ -172,7 +173,7 @@ export class AuthService {
 
   /** Generate a pending TOTP secret + provisioning URI; only saved when verified. */
   async totpSetup(userId: string) {
-    const user = await prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, email: true, totpEnabled: true },
     });
@@ -181,7 +182,7 @@ export class AuthService {
 
     const secret = base32Encode(crypto.randomBytes(20));
     // Store secret but don't flip totpEnabled until user verifies
-    await prisma.user.update({ where: { id: userId }, data: { totpSecret: secret } });
+    await this.prisma.user.update({ where: { id: userId }, data: { totpSecret: secret } });
     return {
       secret,
       otpauthUrl: totpUri(user.email, 'TSI VMS', secret),
@@ -189,7 +190,7 @@ export class AuthService {
   }
 
   async totpEnable(userId: string, token: string) {
-    const user = await prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { totpSecret: true, totpEnabled: true },
     });
@@ -197,7 +198,7 @@ export class AuthService {
     if (!verifyTotp(user.totpSecret, token)) {
       throw new UnauthorizedException('Invalid code');
     }
-    await prisma.user.update({
+    await this.prisma.user.update({
       where: { id: userId },
       data: { totpEnabled: true },
     });
@@ -205,7 +206,7 @@ export class AuthService {
   }
 
   async totpDisable(userId: string, currentPassword: string, token: string) {
-    const user = await prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { passwordHash: true, totpSecret: true, totpEnabled: true },
     });
@@ -216,7 +217,7 @@ export class AuthService {
     if (!verifyTotp(user.totpSecret, token)) {
       throw new UnauthorizedException('Invalid code');
     }
-    await prisma.user.update({
+    await this.prisma.user.update({
       where: { id: userId },
       data: { totpEnabled: false, totpSecret: null },
     });
@@ -228,7 +229,7 @@ export class AuthService {
    * or a partial response demanding `totp` on the second call.
    */
   async loginWithOptionalTotp(email: string, password: string, totp?: string) {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       throw new UnauthorizedException('Invalid email or password');
     }
@@ -247,11 +248,11 @@ export class AuthService {
   // --- Password reset ----------------------------------------------------
 
   async createResetToken(email: string) {
-    const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    const user = await this.prisma.user.findUnique({ where: { email }, select: { id: true } });
     // Always return the same shape so this isn't an enumeration oracle
     if (!user) return { ok: true };
     const token = crypto.randomBytes(48).toString('hex');
-    await prisma.passwordResetToken.create({
+    await this.prisma.passwordResetToken.create({
       data: {
         userId: user.id,
         token,
@@ -265,15 +266,15 @@ export class AuthService {
     if (!token || newPassword.length < 6) {
       throw new BadRequestException('Invalid request');
     }
-    const row = await prisma.passwordResetToken.findUnique({ where: { token } });
+    const row = await this.prisma.passwordResetToken.findUnique({ where: { token } });
     if (!row || row.usedAt || row.expiresAt < new Date()) {
       throw new BadRequestException('Token invalid or expired');
     }
-    await prisma.user.update({
+    await this.prisma.user.update({
       where: { id: row.userId },
       data: { passwordHash: await bcrypt.hash(newPassword, 10) },
     });
-    await prisma.passwordResetToken.update({
+    await this.prisma.passwordResetToken.update({
       where: { id: row.id },
       data: { usedAt: new Date() },
     });

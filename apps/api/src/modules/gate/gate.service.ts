@@ -4,15 +4,17 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
-import { PrismaClient, VisitStatus } from '@prisma/client';
+import { VisitStatus } from '@prisma/client';
 import { HeadcountGateway } from '../../gateways/headcount.gateway';
+import { PrismaService } from '../../platform/prisma/prisma.service';
 import { JwtUser, isSuperAdmin, workerScope } from '../../common/tenant';
-
-const prisma = new PrismaClient();
 
 @Injectable()
 export class GateService {
-  constructor(private readonly headcount: HeadcountGateway) {}
+  constructor(
+    private readonly headcount: HeadcountGateway,
+    private readonly prisma: PrismaService,
+  ) {}
 
   /** Mark a worker on-site (creates Attendance if not already open). */
   async workerCheckIn(
@@ -23,7 +25,7 @@ export class GateService {
       throw new BadRequestException('workerId and gateId are required');
     }
 
-    const worker = await prisma.worker.findFirst({
+    const worker = await this.prisma.worker.findFirst({
       where: { id: data.workerId, ...workerScope(user) },
       include: { contractor: { select: { organizationId: true } } },
     });
@@ -39,7 +41,7 @@ export class GateService {
     }
 
     // Already inside? Return the open record without creating another.
-    const open = await prisma.attendance.findFirst({
+    const open = await this.prisma.attendance.findFirst({
       where: { workerId: worker.id, checkOut: null },
     });
     if (open) {
@@ -53,7 +55,7 @@ export class GateService {
       branchId = user.branchId;
     } else if (!isSuperAdmin(user)) {
       // Authorize: branch must be in user's org
-      const branch = await prisma.branch.findUnique({
+      const branch = await this.prisma.branch.findUnique({
         where: { id: branchId },
         select: { organizationId: true },
       });
@@ -62,7 +64,7 @@ export class GateService {
       }
     }
 
-    const attendance = await prisma.attendance.create({
+    const attendance = await this.prisma.attendance.create({
       data: {
         workerId: worker.id,
         branchId,
@@ -94,19 +96,19 @@ export class GateService {
    */
   async workerQrToggle(token: string, gateId = 'kiosk', branchId?: string) {
     if (!token) throw new BadRequestException('Token required');
-    const worker = await prisma.worker.findUnique({
+    const worker = await this.prisma.worker.findUnique({
       where: { qrCodeToken: token },
       include: { contractor: { select: { companyName: true } } },
     });
     if (!worker) throw new NotFoundException('Unknown worker QR');
     if (!worker.isActive) throw new BadRequestException('Worker is inactive');
 
-    const open = await prisma.attendance.findFirst({
+    const open = await this.prisma.attendance.findFirst({
       where: { workerId: worker.id, checkOut: null },
     });
 
     if (open) {
-      const updated = await prisma.attendance.update({
+      const updated = await this.prisma.attendance.update({
         where: { id: open.id },
         data: { checkOut: new Date() },
       });
@@ -133,10 +135,10 @@ export class GateService {
       throw new BadRequestException('Worker medical certificate has expired');
     }
 
-    const chosenBranch = branchId ?? (await prisma.branch.findFirst())?.id;
+    const chosenBranch = branchId ?? (await this.prisma.branch.findFirst())?.id;
     if (!chosenBranch) throw new BadRequestException('No branch available');
 
-    const att = await prisma.attendance.create({
+    const att = await this.prisma.attendance.create({
       data: {
         workerId: worker.id,
         branchId: chosenBranch,
@@ -163,13 +165,13 @@ export class GateService {
   async workerCheckOut(user: JwtUser, workerId: string) {
     if (!workerId) throw new BadRequestException('workerId is required');
 
-    const worker = await prisma.worker.findFirst({
+    const worker = await this.prisma.worker.findFirst({
       where: { id: workerId, ...workerScope(user) },
       select: { id: true, fullName: true, skillCategory: true },
     });
     if (!worker) throw new NotFoundException('Worker not found in your organization');
 
-    const open = await prisma.attendance.findFirst({
+    const open = await this.prisma.attendance.findFirst({
       where: { workerId, checkOut: null },
       orderBy: { checkIn: 'desc' },
     });
@@ -177,7 +179,7 @@ export class GateService {
       throw new BadRequestException('Worker is not currently checked in');
     }
 
-    const updated = await prisma.attendance.update({
+    const updated = await this.prisma.attendance.update({
       where: { id: open.id },
       data: { checkOut: new Date() },
     });
@@ -207,7 +209,7 @@ export class GateService {
     const CONFIDENCE_THRESHOLD = 0.85;
 
     // Get active workers
-    const activeWorkers = await prisma.worker.findMany({
+    const activeWorkers = await this.prisma.worker.findMany({
       where: { isActive: true },
       select: {
         id: true,
@@ -244,7 +246,7 @@ export class GateService {
     }
 
     // Log attendance
-    const attendance = await prisma.attendance.create({
+    const attendance = await this.prisma.attendance.create({
       data: {
         workerId: matchedWorker.id,
         branchId,
@@ -267,14 +269,14 @@ export class GateService {
       throw new BadRequestException('qrCodeToken is required');
     }
 
-    const visit = await prisma.visit.findUnique({
+    const visit = await this.prisma.visit.findUnique({
       where: { qrCodeToken },
       include: { visitor: true },
     });
 
     if (!visit) {
       // Maybe it's a worker badge QR — try that route before failing
-      const worker = await prisma.worker.findUnique({ where: { qrCodeToken } });
+      const worker = await this.prisma.worker.findUnique({ where: { qrCodeToken } });
       if (worker) {
         return this.workerQrToggle(qrCodeToken);
       }
@@ -308,7 +310,7 @@ export class GateService {
       );
     }
 
-    const updated = await prisma.visit.update({
+    const updated = await this.prisma.visit.update({
       where: { id: visit.id },
       data: {
         status: VisitStatus.CHECKED_IN,
@@ -330,7 +332,7 @@ export class GateService {
   async getGateLog(gateId: string, hours: number = 24) {
     const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
-    return prisma.attendance.findMany({
+    return this.prisma.attendance.findMany({
       where: {
         gateId,
         checkIn: { gte: since },

@@ -1,8 +1,6 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
 import { Observable, tap } from 'rxjs';
-
-const prisma = new PrismaClient();
+import { PrismaService } from '../../platform/prisma/prisma.service';
 
 // Methods/paths we don't want flooding the audit table.
 const SKIP = new Set(['GET']);
@@ -10,6 +8,8 @@ const SKIP_PATHS = [/^\/health/, /^\/$/];
 
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
+  constructor(private readonly prisma: PrismaService) {}
+
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const req = context.switchToHttp().getRequest();
     const res = context.switchToHttp().getResponse();
@@ -38,7 +38,7 @@ export class AuditInterceptor implements NestInterceptor {
     status: number,
   ) {
     const user = req.user;
-    prisma.auditLog
+    this.prisma.auditLog
       .create({
         data: {
           actorId: user?.userId ?? null,

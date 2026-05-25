@@ -1,20 +1,20 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DocumentType, PrismaClient, VisitStatus } from '@prisma/client';
+import { DocumentType, VisitStatus } from '@prisma/client';
 import * as crypto from 'crypto';
+import { PrismaService } from '../../platform/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { HeadcountGateway } from '../../gateways/headcount.gateway';
-
-const prisma = new PrismaClient();
 
 @Injectable()
 export class PublicService {
   constructor(
     private readonly notifications: NotificationsService,
     private readonly headcount: HeadcountGateway,
+    private readonly prisma: PrismaService,
   ) {}
 
   listBranches() {
-    return prisma.branch.findMany({
+    return this.prisma.branch.findMany({
       select: { id: true, name: true, location: true },
       orderBy: { name: 'asc' },
     });
@@ -30,7 +30,7 @@ export class PublicService {
     if (trimmed.length < 5) {
       throw new BadRequestException('phone is required');
     }
-    const visitor = await prisma.visitor.findUnique({
+    const visitor = await this.prisma.visitor.findUnique({
       where: { phone: trimmed },
       select: {
         id: true,
@@ -72,7 +72,7 @@ export class PublicService {
   }
 
   listHosts() {
-    return prisma.user.findMany({
+    return this.prisma.user.findMany({
       where: { isActive: true },
       // Trim the fields exposed to the public — no role, no email.
       select: { id: true, fullName: true, branchId: true },
@@ -98,13 +98,13 @@ export class PublicService {
       if (!(data as any)[k]) throw new BadRequestException(`${k} is required`);
     }
 
-    const branch = await prisma.branch.findUnique({ where: { id: data.branchId } });
+    const branch = await this.prisma.branch.findUnique({ where: { id: data.branchId } });
     if (!branch) throw new BadRequestException('Branch not found');
-    const host = await prisma.user.findUnique({ where: { id: data.hostId } });
+    const host = await this.prisma.user.findUnique({ where: { id: data.hostId } });
     if (!host) throw new BadRequestException('Host not found');
 
     // Reuse visitor by phone if already in the system; otherwise create new.
-    const existing = await prisma.visitor.findUnique({ where: { phone: data.phone } });
+    const existing = await this.prisma.visitor.findUnique({ where: { phone: data.phone } });
     let visitorId: string;
     if (existing) {
       if (existing.isBlacklisted) {
@@ -112,7 +112,7 @@ export class PublicService {
       }
       visitorId = existing.id;
     } else {
-      const created = await prisma.visitor.create({
+      const created = await this.prisma.visitor.create({
         data: {
           fullName: data.fullName,
           phone: data.phone,
@@ -127,7 +127,7 @@ export class PublicService {
       visitorId = created.id;
     }
 
-    const visit = await prisma.visit.create({
+    const visit = await this.prisma.visit.create({
       data: {
         visitorId,
         branchId: data.branchId,

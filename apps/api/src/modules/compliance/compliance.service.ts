@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaService } from '../../platform/prisma/prisma.service';
 import {
   JwtUser,
   contractorScope,
@@ -7,12 +7,12 @@ import {
   workerScope,
 } from '../../common/tenant';
 
-const prisma = new PrismaClient();
-
 @Injectable()
 export class ComplianceService {
+  constructor(private readonly prisma: PrismaService) {}
+
   async getWorkerCompliance(user: JwtUser, workerId: string) {
-    const worker = await prisma.worker.findFirst({
+    const worker = await this.prisma.worker.findFirst({
       where: { id: workerId, ...workerScope(user) },
     });
     if (!worker) return null;
@@ -33,12 +33,12 @@ export class ComplianceService {
   }
 
   async getContractorCompliance(user: JwtUser, contractorId: string) {
-    const contractor = await prisma.contractor.findFirst({
+    const contractor = await this.prisma.contractor.findFirst({
       where: { id: contractorId, ...contractorScope(user) },
     });
     if (!contractor) return null;
 
-    const workers = await prisma.worker.findMany({ where: { contractorId } });
+    const workers = await this.prisma.worker.findMany({ where: { contractorId } });
     const now = new Date();
     const compliantWorkers = workers.filter(
       (w: any) => w.policeVerified && w.medicalExpiry > now,
@@ -57,7 +57,7 @@ export class ComplianceService {
   }
 
   async getAllComplianceStatus(user: JwtUser) {
-    const contractors = await prisma.contractor.findMany({
+    const contractors = await this.prisma.contractor.findMany({
       where: contractorScope(user),
       include: { workers: true },
     });
@@ -81,13 +81,13 @@ export class ComplianceService {
 
   async updateWorkerCompliance(user: JwtUser, workerId: string, data: any) {
     if (!isSuperAdmin(user)) {
-      const w = await prisma.worker.findFirst({
+      const w = await this.prisma.worker.findFirst({
         where: { id: workerId, ...workerScope(user) },
         select: { id: true },
       });
       if (!w) throw new NotFoundException('Worker not found');
     }
-    return prisma.worker.update({
+    return this.prisma.worker.update({
       where: { id: workerId },
       data: {
         policeVerified: data.policeVerified !== undefined ? data.policeVerified : undefined,
@@ -100,7 +100,7 @@ export class ComplianceService {
     const now = new Date();
     const threshold = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
 
-    const workers = await prisma.worker.findMany({
+    const workers = await this.prisma.worker.findMany({
       where: { isActive: true, medicalExpiry: { lte: threshold }, ...workerScope(user) },
       include: { contractor: { select: { companyName: true } } },
       orderBy: { medicalExpiry: 'asc' },

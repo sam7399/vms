@@ -1,21 +1,22 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { PassDirection, PrismaClient } from '@prisma/client';
+import { PassDirection } from '@prisma/client';
+import { PrismaService } from '../../platform/prisma/prisma.service';
 import { JwtUser, isSuperAdmin, visitScope } from '../../common/tenant';
-
-const prisma = new PrismaClient();
 
 @Injectable()
 export class MaterialPassService {
+  constructor(private readonly prisma: PrismaService) {}
+
   /** All passes for a single visit (scoped). */
   async listForVisit(user: JwtUser, visitId: string) {
     if (!isSuperAdmin(user)) {
-      const ok = await prisma.visit.findFirst({
+      const ok = await this.prisma.visit.findFirst({
         where: { id: visitId, ...visitScope(user) },
         select: { id: true },
       });
       if (!ok) throw new NotFoundException('Visit not found');
     }
-    return prisma.materialGatePass.findMany({
+    return this.prisma.materialGatePass.findMany({
       where: { visitId },
       orderBy: { createdAt: 'desc' },
     });
@@ -23,7 +24,7 @@ export class MaterialPassService {
 
   /** Recent passes across the user's whole org. */
   async listRecent(user: JwtUser, limit = 100) {
-    return prisma.materialGatePass.findMany({
+    return this.prisma.materialGatePass.findMany({
       where: { visit: { ...visitScope(user) } } as any,
       take: limit,
       orderBy: { createdAt: 'desc' },
@@ -53,13 +54,13 @@ export class MaterialPassService {
       throw new BadRequestException('visitId, direction and description are required');
     }
     if (!isSuperAdmin(user)) {
-      const ok = await prisma.visit.findFirst({
+      const ok = await this.prisma.visit.findFirst({
         where: { id: data.visitId, ...visitScope(user) },
         select: { id: true },
       });
       if (!ok) throw new NotFoundException('Visit not found');
     }
-    return prisma.materialGatePass.create({
+    return this.prisma.materialGatePass.create({
       data: {
         visitId: data.visitId,
         direction: PassDirection[data.direction],

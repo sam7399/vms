@@ -1,20 +1,21 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { HeadcountGateway } from '../../gateways/headcount.gateway';
+import { PrismaService } from '../../platform/prisma/prisma.service';
 import type { JwtUser } from '../../common/tenant';
-
-const prisma = new PrismaClient();
 
 @Controller('sos')
 @UseGuards(JwtAuthGuard)
 export class SosController {
-  constructor(private readonly headcount: HeadcountGateway) {}
+  constructor(
+    private readonly headcount: HeadcountGateway,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Post('trigger')
   async trigger(@CurrentUser() user: JwtUser, @Body() body: { message?: string }) {
-    const me = await prisma.user.findUnique({
+    const me = await this.prisma.user.findUnique({
       where: { id: user.userId },
       select: { fullName: true, email: true, branch: { select: { name: true } } },
     });

@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaClient, DocumentType, Role } from '@prisma/client';
+import { DocumentType, Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { PrismaService } from '../../platform/prisma/prisma.service';
 import {
   JwtUser,
   branchScope,
@@ -13,13 +14,13 @@ import {
   attendanceScope,
 } from '../../common/tenant';
 
-const prisma = new PrismaClient();
-
 @Injectable()
 export class AdminService {
+  constructor(private readonly prisma: PrismaService) {}
+
   // --- Read helpers (used by form dropdowns) ----------------------
   listBranches(user: JwtUser) {
-    return prisma.branch.findMany({
+    return this.prisma.branch.findMany({
       where: branchScope(user),
       select: { id: true, name: true, location: true, organizationId: true },
       orderBy: { name: 'asc' },
@@ -27,7 +28,7 @@ export class AdminService {
   }
 
   listHosts(user: JwtUser) {
-    return prisma.user.findMany({
+    return this.prisma.user.findMany({
       where: { isActive: true, ...userScope(user) },
       select: { id: true, fullName: true, email: true, role: true, branchId: true },
       orderBy: { fullName: 'asc' },
@@ -35,7 +36,7 @@ export class AdminService {
   }
 
   listUsers(user: JwtUser) {
-    return prisma.user.findMany({
+    return this.prisma.user.findMany({
       where: userScope(user),
       select: {
         id: true,
@@ -55,13 +56,13 @@ export class AdminService {
   async setUserActive(user: JwtUser, id: string, isActive: boolean) {
     // Scope: can only edit users in your org
     if (!isSuperAdmin(user)) {
-      const found = await prisma.user.findFirst({
+      const found = await this.prisma.user.findFirst({
         where: { id, ...userScope(user) },
         select: { id: true },
       });
       if (!found) throw new NotFoundException('User not found in your organization');
     }
-    return prisma.user.update({
+    return this.prisma.user.update({
       where: { id },
       data: { isActive },
       select: { id: true, fullName: true, email: true, isActive: true },
@@ -78,14 +79,14 @@ export class AdminService {
     let orgId = data.organizationId;
     if (isSuperAdmin(user)) {
       if (!orgId) {
-        const first = await prisma.organization.findFirst();
+        const first = await this.prisma.organization.findFirst();
         if (!first) throw new BadRequestException('No organization exists yet');
         orgId = first.id;
       }
     } else {
       orgId = requireOrg(user);
     }
-    return prisma.branch.create({
+    return this.prisma.branch.create({
       data: {
         name: data.name.slice(0, 255),
         location: data.location.slice(0, 500),
@@ -95,7 +96,7 @@ export class AdminService {
   }
 
   listVisitors(user: JwtUser) {
-    return prisma.visitor.findMany({
+    return this.prisma.visitor.findMany({
       where: visitorScope(user),
       select: {
         id: true,
@@ -116,13 +117,13 @@ export class AdminService {
   async setVisitorBlacklist(user: JwtUser, id: string, blacklist: boolean) {
     // Authorize: visitor must be reachable in user's org (or super admin)
     if (!isSuperAdmin(user)) {
-      const v = await prisma.visitor.findFirst({
+      const v = await this.prisma.visitor.findFirst({
         where: { id, ...visitorScope(user) },
         select: { id: true },
       });
       if (!v) throw new NotFoundException('Visitor not found in your organization');
     }
-    return prisma.visitor.update({
+    return this.prisma.visitor.update({
       where: { id },
       data: { isBlacklisted: blacklist },
       select: { id: true, fullName: true, isBlacklisted: true },
@@ -130,7 +131,7 @@ export class AdminService {
   }
 
   listContractors(user: JwtUser) {
-    return prisma.contractor.findMany({
+    return this.prisma.contractor.findMany({
       where: contractorScope(user),
       include: { _count: { select: { workers: true } } },
       orderBy: { companyName: 'asc' },
@@ -140,7 +141,7 @@ export class AdminService {
   listWorkers(user: JwtUser, contractorId?: string) {
     const where: any = workerScope(user);
     if (contractorId) where.contractorId = contractorId;
-    return prisma.worker.findMany({
+    return this.prisma.worker.findMany({
       where,
       include: { contractor: { select: { companyName: true } } },
       orderBy: { fullName: 'asc' },
@@ -148,7 +149,7 @@ export class AdminService {
   }
 
   listAttendance(user: JwtUser, limit = 200) {
-    return prisma.attendance.findMany({
+    return this.prisma.attendance.findMany({
       where: attendanceScope(user),
       take: limit,
       orderBy: { checkIn: 'desc' },
@@ -181,7 +182,7 @@ export class AdminService {
     }> = [];
 
     // (1) Visitors with 3+ visits in last 24h
-    const recent = await prisma.visit.findMany({
+    const recent = await this.prisma.visit.findMany({
       where: { createdAt: { gte: last24h }, ...visitWhere },
       select: { id: true, visitorId: true, visitor: { select: { fullName: true, phone: true } } },
     });
@@ -205,7 +206,7 @@ export class AdminService {
     }
 
     // (2) After-hours check-ins (before 06:00 or after 22:00 local UTC)
-    const afterHours = await prisma.visit.findMany({
+    const afterHours = await this.prisma.visit.findMany({
       where: {
         actualEntry: { gte: last7d },
         ...visitWhere,
@@ -229,7 +230,7 @@ export class AdminService {
     }
 
     // (3) Repeated rejections from same phone (>=2 in 7d)
-    const rejected = await prisma.visit.findMany({
+    const rejected = await this.prisma.visit.findMany({
       where: {
         status: 'REJECTED',
         updatedAt: { gte: last7d },
@@ -257,7 +258,7 @@ export class AdminService {
     }
 
     // (4) Blacklisted visitor attempted entry (any blacklisted visitor with a visit in last 7d)
-    const blacklistedAttempts = await prisma.visit.findMany({
+    const blacklistedAttempts = await this.prisma.visit.findMany({
       where: {
         createdAt: { gte: last7d },
         visitor: { isBlacklisted: true },
@@ -303,7 +304,7 @@ export class AdminService {
     since.setUTCHours(0, 0, 0, 0);
     since.setUTCDate(since.getUTCDate() - cap);
 
-    const visits = await prisma.visit.findMany({
+    const visits = await this.prisma.visit.findMany({
       where: { createdAt: { gte: since }, ...(isSuperAdmin(user) ? {} : { branch: { organizationId: requireOrg(user) } }) },
       select: { createdAt: true },
     });
@@ -329,15 +330,15 @@ export class AdminService {
   // Audit log — SUPER_ADMIN sees all; ORG_ADMIN sees entries by actors in their org.
   async listAuditLogs(user: JwtUser, limit = 200) {
     if (isSuperAdmin(user)) {
-      return prisma.auditLog.findMany({ take: limit, orderBy: { createdAt: 'desc' } });
+      return this.prisma.auditLog.findMany({ take: limit, orderBy: { createdAt: 'desc' } });
     }
     // Scope by actor — find user IDs in this org
-    const orgUsers = await prisma.user.findMany({
+    const orgUsers = await this.prisma.user.findMany({
       where: userScope(user),
       select: { id: true },
     });
     const ids = orgUsers.map((u) => u.id);
-    return prisma.auditLog.findMany({
+    return this.prisma.auditLog.findMany({
       where: { actorId: { in: ids } },
       take: limit,
       orderBy: { createdAt: 'desc' },
@@ -356,7 +357,7 @@ export class AdminService {
     let orgId = data.organizationId;
     if (isSuperAdmin(user)) {
       if (!orgId) {
-        const first = await prisma.organization.findFirst();
+        const first = await this.prisma.organization.findFirst();
         if (!first) throw new BadRequestException('No organization exists yet');
         orgId = first.id;
       }
@@ -365,7 +366,7 @@ export class AdminService {
       orgId = requireOrg(user);
     }
 
-    return prisma.contractor.create({
+    return this.prisma.contractor.create({
       data: {
         organizationId: orgId!,
         companyName: data.companyName,
@@ -402,7 +403,7 @@ export class AdminService {
       if (!(data as any)[k]) throw new BadRequestException(`${k} is required`);
     }
 
-    const contractor = await prisma.contractor.findUnique({
+    const contractor = await this.prisma.contractor.findUnique({
       where: { id: data.contractorId },
       select: { id: true, organizationId: true },
     });
@@ -412,7 +413,7 @@ export class AdminService {
       throw new ForbiddenException('Contractor belongs to another organization');
     }
 
-    return prisma.worker.create({
+    return this.prisma.worker.create({
       data: {
         contractorId: data.contractorId,
         fullName: data.fullName,
@@ -518,7 +519,7 @@ export class AdminService {
     const cap = Math.min(Math.max(days, 1), 90);
     const since = new Date(Date.now() - cap * 24 * 60 * 60 * 1000);
 
-    const records = await prisma.attendance.findMany({
+    const records = await this.prisma.attendance.findMany({
       where: {
         checkOut: { not: null },
         checkIn: { gte: since },
@@ -599,7 +600,7 @@ export class AdminService {
       throw new BadRequestException('email, password, fullName, branchId required');
     }
 
-    const branch = await prisma.branch.findUnique({
+    const branch = await this.prisma.branch.findUnique({
       where: { id: data.branchId },
       select: { id: true, organizationId: true },
     });
@@ -608,7 +609,7 @@ export class AdminService {
       throw new ForbiddenException('Branch belongs to another organization');
     }
 
-    return prisma.user.create({
+    return this.prisma.user.create({
       data: {
         branchId: data.branchId,
         email: data.email,

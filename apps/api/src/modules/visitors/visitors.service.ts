@@ -1,11 +1,10 @@
 import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { PrismaClient, VisitStatus } from '@prisma/client';
+import { VisitStatus } from '@prisma/client';
 import * as crypto from 'crypto';
+import { PrismaService } from '../../platform/prisma/prisma.service';
 import { HeadcountGateway } from '../../gateways/headcount.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { JwtUser, isSuperAdmin, visitScope } from '../../common/tenant';
-
-const prisma = new PrismaClient();
 
 // Strip "data:image/jpeg;base64," prefix and convert to Buffer for Prisma Bytes.
 // Returns undefined for empty input so Prisma leaves the column null.
@@ -25,6 +24,7 @@ export class VisitorsService {
   constructor(
     private readonly headcount: HeadcountGateway,
     private readonly notifications: NotificationsService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async createVisit(user: JwtUser, data: any) {
@@ -34,7 +34,7 @@ export class VisitorsService {
 
     // Authorize: branch must be in user's org (unless super admin)
     if (!isSuperAdmin(user)) {
-      const branch = await prisma.branch.findUnique({
+      const branch = await this.prisma.branch.findUnique({
         where: { id: data.branchId },
         select: { organizationId: true },
       });
@@ -49,7 +49,7 @@ export class VisitorsService {
       ? Math.min(20, Math.floor(data.groupSize))
       : 1;
 
-    return prisma.visit.create({
+    return this.prisma.visit.create({
       data: {
         visitorId: data.visitorId,
         branchId: data.branchId,
@@ -65,7 +65,7 @@ export class VisitorsService {
   }
 
   async setVip(visitorId: string, isVip: boolean) {
-    return prisma.visitor.update({
+    return this.prisma.visitor.update({
       where: { id: visitorId },
       data: { isVip },
       select: { id: true, fullName: true, isVip: true },
@@ -75,7 +75,7 @@ export class VisitorsService {
   async getAllVisits(user: JwtUser, branchId?: string) {
     const where: any = { ...visitScope(user) };
     if (branchId) where.branchId = branchId;
-    return prisma.visit.findMany({
+    return this.prisma.visit.findMany({
       where,
       include: {
         visitor: true,
@@ -86,7 +86,7 @@ export class VisitorsService {
   }
 
   async getPendingVisits(user: JwtUser) {
-    return prisma.visit.findMany({
+    return this.prisma.visit.findMany({
       where: { status: VisitStatus.PENDING, ...visitScope(user) },
       include: {
         visitor: true,
@@ -99,7 +99,7 @@ export class VisitorsService {
 
   /** Public visitor pass — exposed without auth so the visitor can open the link. */
   async getPublicPass(id: string) {
-    const visit = await prisma.visit.findUnique({
+    const visit = await this.prisma.visit.findUnique({
       where: { id },
       include: {
         visitor: { select: { id: true, fullName: true, company: true, phone: true } },
@@ -134,7 +134,7 @@ export class VisitorsService {
     since.setUTCHours(0, 0, 0, 0);
     since.setUTCDate(since.getUTCDate() - (cap - 1));
 
-    const visits = await prisma.visit.findMany({
+    const visits = await this.prisma.visit.findMany({
       where: { createdAt: { gte: since }, ...visitScope(user) },
       select: { createdAt: true, status: true },
     });
@@ -158,7 +158,7 @@ export class VisitorsService {
 
   /** List of vehicles seen — every visit with a vehicleNumber. */
   async listVehicles(user: JwtUser, limit = 200) {
-    return prisma.visit.findMany({
+    return this.prisma.visit.findMany({
       where: { vehicleNumber: { not: null }, ...visitScope(user) },
       take: limit,
       orderBy: { createdAt: 'desc' },
@@ -176,7 +176,7 @@ export class VisitorsService {
   }
 
   async getVisit(user: JwtUser, id: string) {
-    return prisma.visit.findFirst({
+    return this.prisma.visit.findFirst({
       where: { id, ...visitScope(user) },
       include: {
         visitor: true,
@@ -187,7 +187,7 @@ export class VisitorsService {
 
   private async ensureVisitInScope(user: JwtUser, id: string) {
     if (isSuperAdmin(user)) return;
-    const found = await prisma.visit.findFirst({
+    const found = await this.prisma.visit.findFirst({
       where: { id, ...visitScope(user) },
       select: { id: true },
     });
@@ -199,7 +199,7 @@ export class VisitorsService {
 
   async updateVisitStatus(user: JwtUser, id: string, status: string) {
     await this.ensureVisitInScope(user, id);
-    const updated = await prisma.visit.update({
+    const updated = await this.prisma.visit.update({
       where: { id },
       data: { status: status as any },
       include: {
@@ -255,7 +255,7 @@ export class VisitorsService {
     const visitWhere: any = { status: VisitStatus.CHECKED_IN, actualExit: null, ...orgFilter };
     if (branchId) visitWhere.branchId = branchId;
 
-    const visits = await prisma.visit.findMany({
+    const visits = await this.prisma.visit.findMany({
       where: visitWhere,
       orderBy: { actualEntry: 'desc' },
       take: 100,
@@ -271,7 +271,7 @@ export class VisitorsService {
     const attendanceWhere: any = { checkOut: null };
     if (!isSuperAdmin(user)) attendanceWhere.branch = { organizationId: (user as any).orgId };
     if (branchId) attendanceWhere.branchId = branchId;
-    const workers = await prisma.attendance.findMany({
+    const workers = await this.prisma.attendance.findMany({
       where: attendanceWhere,
       orderBy: { checkIn: 'desc' },
       take: 100,
@@ -312,7 +312,7 @@ export class VisitorsService {
 
   async checkInVisitor(user: JwtUser, visitId: string) {
     await this.ensureVisitInScope(user, visitId);
-    const v = await prisma.visit.update({
+    const v = await this.prisma.visit.update({
       where: { id: visitId },
       data: { status: VisitStatus.CHECKED_IN, actualEntry: new Date() },
     });
@@ -322,7 +322,7 @@ export class VisitorsService {
 
   async checkOutVisitor(user: JwtUser, visitId: string) {
     await this.ensureVisitInScope(user, visitId);
-    const v = await prisma.visit.update({
+    const v = await this.prisma.visit.update({
       where: { id: visitId },
       data: { status: VisitStatus.CHECKED_OUT, actualExit: new Date() },
     });
@@ -331,7 +331,7 @@ export class VisitorsService {
   }
 
   async createVisitor(data: any) {
-    return prisma.visitor.create({
+    return this.prisma.visitor.create({
       data: {
         fullName: data.fullName,
         phone: data.phone,
@@ -348,7 +348,7 @@ export class VisitorsService {
     const where: any = isSuperAdmin(user)
       ? {}
       : { visits: { some: { branch: { organizationId: (user as any).orgId } } } };
-    return prisma.visitor.findMany({
+    return this.prisma.visitor.findMany({
       where,
       orderBy: { id: 'desc' },
     });
@@ -367,11 +367,11 @@ export class VisitorsService {
     }
 
     const [activeVisits, workers] = await Promise.all([
-      prisma.visit.findMany({
+      this.prisma.visit.findMany({
         where: visitWhere,
         select: { id: true, visitor: { select: { company: true } } },
       }),
-      prisma.attendance.count({ where: attendanceWhere }),
+      this.prisma.attendance.count({ where: attendanceWhere }),
     ]);
 
     const visitors = activeVisits.filter((v) => v.visitor.company).length;

@@ -3,7 +3,6 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -13,9 +12,8 @@ async function bootstrap() {
 
   // Global exception filter
   app.useGlobalFilters(new HttpExceptionFilter());
-
-  // Audit every write
-  app.useGlobalInterceptors(new AuditInterceptor());
+  // Audit interceptor is registered globally via APP_INTERCEPTOR in AppModule
+  // so it can receive DI (PrismaService).
 
   // CORS — supports comma-separated list of origins via CORS_ORIGIN env
   const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')

@@ -1,10 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaService } from '../../platform/prisma/prisma.service';
 import { HeadcountGateway } from '../../gateways/headcount.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { JwtUser, isSuperAdmin } from '../../common/tenant';
-
-const prisma = new PrismaClient();
 
 const LEVELS = new Set(['info', 'warning', 'urgent']);
 
@@ -13,6 +11,7 @@ export class NoticesService {
   constructor(
     private readonly headcount: HeadcountGateway,
     private readonly notifications: NotificationsService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /** Notices the calling user should see right now. */
@@ -39,7 +38,7 @@ export class NoticesService {
       });
     }
 
-    return prisma.notice.findMany({ where, orderBy: { createdAt: 'desc' }, take: 50 });
+    return this.prisma.notice.findMany({ where, orderBy: { createdAt: 'desc' }, take: 50 });
   }
 
   async create(
@@ -56,7 +55,7 @@ export class NoticesService {
     if (!isSuperAdmin(user)) {
       orgId = (user as any).orgId ?? null;
       if (data.branchId) {
-        const b = await prisma.branch.findUnique({
+        const b = await this.prisma.branch.findUnique({
           where: { id: data.branchId },
           select: { organizationId: true },
         });
@@ -66,7 +65,7 @@ export class NoticesService {
       }
     }
 
-    const me = await prisma.user.findUnique({
+    const me = await this.prisma.user.findUnique({
       where: { id: (user as any).userId },
       select: { fullName: true, email: true, branch: { select: { organizationId: true } } },
     });
@@ -74,7 +73,7 @@ export class NoticesService {
       orgId = me.branch.organizationId;
     }
 
-    const notice = await prisma.notice.create({
+    const notice = await this.prisma.notice.create({
       data: {
         title: data.title.trim().slice(0, 200),
         body: data.body.trim().slice(0, 2000),
@@ -105,7 +104,7 @@ export class NoticesService {
   }
 
   async remove(user: JwtUser, id: string) {
-    const existing = await prisma.notice.findUnique({ where: { id } });
+    const existing = await this.prisma.notice.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Notice not found');
     if (!isSuperAdmin(user)) {
       const orgId = (user as any).orgId;
@@ -113,7 +112,7 @@ export class NoticesService {
         throw new ForbiddenException('Notice belongs to another organization');
       }
     }
-    await prisma.notice.delete({ where: { id } });
+    await this.prisma.notice.delete({ where: { id } });
     this.headcount.broadcastNoticeRemoved(id);
     return { ok: true };
   }

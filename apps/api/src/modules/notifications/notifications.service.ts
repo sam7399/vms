@@ -1,7 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { PrismaService } from '../../platform/prisma/prisma.service';
 
 interface SendArgs {
   to: string;
@@ -33,6 +31,8 @@ export class NotificationsService {
     'VMS <onboarding@resend.dev>'; // resend's sandbox sender — works without domain verification but only to verified test addresses
   private readonly telegramToken = process.env.TELEGRAM_BOT_TOKEN;
   private readonly telegramChatId = process.env.TELEGRAM_CHAT_ID;
+
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Free notification channel via Telegram Bot API. No-op without
@@ -107,7 +107,7 @@ export class NotificationsService {
     if (!args.token || !args.token.startsWith('ExponentPushToken')) {
       return { ok: false, reason: 'Invalid Expo push token' };
     }
-    await prisma.deviceToken.upsert({
+    await this.prisma.deviceToken.upsert({
       where: { token: args.token },
       update: {
         platform: args.platform.slice(0, 20),
@@ -128,7 +128,7 @@ export class NotificationsService {
 
   async unregisterDeviceToken(token: string) {
     if (!token) return { ok: false };
-    await prisma.deviceToken.deleteMany({ where: { token } });
+    await this.prisma.deviceToken.deleteMany({ where: { token } });
     return { ok: true };
   }
 
@@ -142,7 +142,7 @@ export class NotificationsService {
     if (args.branchId) where.branchId = args.branchId;
     if (args.orgId) where.orgId = args.orgId;
 
-    const tokens = await prisma.deviceToken.findMany({ where, select: { token: true } });
+    const tokens = await this.prisma.deviceToken.findMany({ where, select: { token: true } });
     if (tokens.length === 0) return { sent: 0, failed: 0 };
 
     const messages = tokens.map((t) => ({

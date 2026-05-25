@@ -1,7 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { PrismaService } from '../../platform/prisma/prisma.service';
 
 // face-api.js embeddings are Float32Array(128). We accept them as a JSON
 // array of numbers (preferred for size) or as base64-encoded bytes.
@@ -45,16 +43,18 @@ function euclidean(a: Float32Array, b: Float32Array): number {
 
 @Injectable()
 export class FaceService {
+  constructor(private readonly prisma: PrismaService) {}
+
   /** Look up a person by their face embedding. Returns nearest match if below threshold. */
   async identify(input: unknown, threshold = 0.6) {
     const q = decodeEmbedding(input);
 
     const [visitors, workers] = await Promise.all([
-      prisma.visitor.findMany({
+      this.prisma.visitor.findMany({
         where: { faceEmbedding: { not: null } },
         select: { id: true, fullName: true, phone: true, faceEmbedding: true, isBlacklisted: true },
       }),
-      prisma.worker.findMany({
+      this.prisma.worker.findMany({
         where: { faceEmbedding: { not: null }, isActive: true },
         select: {
           id: true,
@@ -131,13 +131,13 @@ export class FaceService {
     const q = decodeEmbedding(embedding);
     const buf = bufFromFloat32(q);
     if (kind === 'visitor') {
-      return prisma.visitor.update({
+      return this.prisma.visitor.update({
         where: { id },
         data: { faceEmbedding: buf },
         select: { id: true, fullName: true },
       });
     }
-    return prisma.worker.update({
+    return this.prisma.worker.update({
       where: { id },
       data: { faceEmbedding: buf },
       select: { id: true, fullName: true },
