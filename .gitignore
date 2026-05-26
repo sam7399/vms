@@ -50,3 +50,4 @@ _seed_org2.js
 _check_db.js
 _backfill_worker_qr.js
 .claude/
+.storage/
