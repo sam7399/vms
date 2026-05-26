@@ -4,6 +4,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { PrismaModule } from './platform/prisma/prisma.module';
 import { EventsModule } from './platform/events/events.module';
+import { JobsModule } from './platform/jobs/jobs.module';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { AuthModule } from './modules/auth/auth.module';
 import { VisitorsModule } from './modules/visitors/visitors.module';
@@ -33,6 +34,7 @@ import { HealthController } from './health.controller';
     ]),
     PrismaModule,
     EventsModule,
+    JobsModule,
     HeadcountModule,
     AuthModule,
     VisitorsModule,

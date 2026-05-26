@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../platform/prisma/prisma.service';
+import { JobQueueService } from '../../platform/jobs/job-queue.service';
 
 interface SendArgs {
   to: string;
@@ -22,8 +23,11 @@ interface PushArgs {
  * Otherwise becomes a no-op that logs what would have been sent.
  * This lets the app run on the free tier without any email provider.
  */
+const PUSH_QUEUE = 'notifications.push';
+const EMAIL_QUEUE = 'notifications.email';
+
 @Injectable()
-export class NotificationsService {
+export class NotificationsService implements OnModuleInit {
   private readonly log = new Logger('Notifications');
   private readonly apiKey = process.env.RESEND_API_KEY;
   private readonly from =
@@ -32,7 +36,15 @@ export class NotificationsService {
   private readonly telegramToken = process.env.TELEGRAM_BOT_TOKEN;
   private readonly telegramChatId = process.env.TELEGRAM_CHAT_ID;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jobs: JobQueueService,
+  ) {}
+
+  onModuleInit() {
+    this.jobs.register<PushArgs>(PUSH_QUEUE, (data) => this.runPush(data), { concurrency: 4 });
+    this.jobs.register<SendArgs>(EMAIL_QUEUE, (data) => this.runEmail(data), { concurrency: 2 });
+  }
 
   /**
    * Free notification channel via Telegram Bot API. No-op without
@@ -133,10 +145,23 @@ export class NotificationsService {
   }
 
   /**
-   * Fan-out to every device matching the filter via Expo's HTTPS push
-   * endpoint. Free — no API key required. No-ops if there are no recipients.
+   * Enqueue a push fan-out. Returns immediately — actual Expo delivery
+   * happens in the JobQueue worker (this process or a separate ai-worker).
+   * Use pushToDevicesSync() only when callers genuinely need send counts.
    */
-  async pushToDevices(args: PushArgs): Promise<{ sent: number; failed: number }> {
+  pushToDevices(args: PushArgs): Promise<void> {
+    return this.jobs.enqueue(PUSH_QUEUE, args);
+  }
+
+  /**
+   * Synchronous variant for the rare caller that needs delivery stats.
+   * Avoid on hot request paths.
+   */
+  pushToDevicesSync(args: PushArgs): Promise<{ sent: number; failed: number }> {
+    return this.runPush(args);
+  }
+
+  private async runPush(args: PushArgs): Promise<{ sent: number; failed: number }> {
     const where: any = {};
     if (args.userId) where.userId = args.userId;
     if (args.branchId) where.branchId = args.branchId;
@@ -180,6 +205,10 @@ export class NotificationsService {
       }
     }
     return { sent, failed };
+  }
+
+  private async runEmail(args: SendArgs): Promise<{ sent: boolean; reason?: string }> {
+    return this.send(args);
   }
 
   async sendVisitorPassApproved(args: {
