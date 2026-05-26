@@ -2,35 +2,118 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* ──────────────────────────────────────────────────────────────
+ * Theme variables. Mirrors packages/ui/src/tokens/themes/*.ts
+ * Kept in sync manually — Next.js can't import the TS at CSS build.
+ * Validated by the design system's tokens/themes/index.ts (themeCss()).
+ * ────────────────────────────────────────────────────────────── */
+
+:root,
+[data-theme='dark'] {
+  /* surfaces — graphite */
+  --surface-0: #060814;
+  --surface-1: #0B0F1F;
+  --surface-2: #11162A;
+  --surface-3: #171D34;
+  --surface-4: #1F2641;
+  --border-subtle: #1F2641;
+  --border-strong: #2A3158;
+  --text-primary: #F3F5FA;
+  --text-secondary: #9AA3B8;
+  --text-tertiary: #5A6480;
+  --text-disabled: #3B4263;
+  --text-on-accent: #FFFFFF;
+
+  /* density (compact default per design spec C3) */
+  --density-row-height: 32px;
+  --density-font-size: 13px;
+  --density-input-height: 32px;
+
+  /* legacy hsl variables — back-compat for existing styles */
   --background: 234deg 37% 7%;
   --foreground: 210deg 20% 96%;
+  --radius: 12px;
+}
+
+[data-theme='light'] {
+  --surface-0: #FAFBFD;
+  --surface-1: #FFFFFF;
+  --surface-2: #F4F6FA;
+  --surface-3: #E9EDF4;
+  --surface-4: #DBE1EC;
+  --border-subtle: #E1E5EE;
+  --border-strong: #B7BFCF;
+  --text-primary: #0B0F1F;
+  --text-secondary: #3B4263;
+  --text-tertiary: #5A6480;
+  --text-disabled: #9AA3B8;
+  --text-on-accent: #FFFFFF;
+  --density-row-height: 36px;
+  --density-font-size: 14px;
+  --density-input-height: 36px;
+}
+
+[data-density='default'] {
+  --density-row-height: 40px;
+  --density-font-size: 13px;
+  --density-input-height: 36px;
+}
+
+[data-density='comfort'] {
+  --density-row-height: 48px;
+  --density-font-size: 14px;
+  --density-input-height: 40px;
 }
 
 body {
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
+  background-color: var(--surface-0);
+  color: var(--text-primary);
   font-feature-settings: 'cv11', 'ss01';
+  font-variant-numeric: tabular-nums slashed-zero;
 }
 
-/* Smoother fonts */
-html, body {
+html,
+body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-family: 'InterVariable', 'Inter', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, sans-serif;
 }
 
-/* Custom scrollbar to match the brand */
+/* Custom scrollbar — operator-friendly, subtle */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.02);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.25);
+  background: var(--border-strong);
   border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.4);
+  background: #3B4263;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+/* Reduced-motion respects */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus ring — accessible without being heavy */
+:focus-visible {
+  outline: 2px solid #7C3AED;
+  outline-offset: 2px;
+  border-radius: 4px;
 }

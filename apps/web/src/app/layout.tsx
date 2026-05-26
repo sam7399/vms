@@ -29,11 +29,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-theme="dark" data-density="compact" suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link
+          rel="stylesheet"
+          href="https://rsms.me/inter/inter.css"
+        />
       </head>
-      <body suppressHydrationWarning className="bg-surface-950">
+      <body suppressHydrationWarning className="bg-surface-0 text-text-primary">
         <I18nProvider>
           <AuthProvider>
             <div className="relative min-h-screen flex flex-col bg-surface-950 text-white overflow-x-hidden">
