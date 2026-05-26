@@ -1,0 +1,12 @@
+{
+  "name": "@vms/shared",
+  "version": "1.0.0",
+  "description": "Types, schemas, and constants shared between api / web / mobile / kiosk",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./rbac": "./src/rbac/index.ts"
+  }
+}

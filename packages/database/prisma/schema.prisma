@@ -12,10 +12,13 @@ enum Role {
   SUPER_ADMIN
   ORG_ADMIN
   HR_MANAGER
+  SECURITY_HEAD
   SECURITY_GUARD
   RECEPTIONIST
   CONTRACTOR_SUPERVISOR
   EMPLOYEE
+  SOC_OPERATOR
+  AUDITOR
 }
 
 enum DocumentType {
@@ -122,15 +125,44 @@ model User {
   isActive      Boolean   @default(true)
   totpSecret    String?   @db.VarChar(255)
   totpEnabled   Boolean   @default(false)
+
+  // ── RBAC extensions (Phase 3) ──────────────────────────────────
+  /// Direct permission grants (additive over role bundle)
+  extraPermissions   Json?
+  /// Negative grants — these override role + extra permissions
+  deniedPermissions  Json?
+  /// Resolved MFA policy snapshot — methods user MUST present
+  requiredMfa        Json?
+
+  // ── Password-rotation hardening ────────────────────────────────
+  passwordChangedAt  DateTime?
+  /// Hashes of the last N passwords (configurable via TenantSecurityPolicy)
+  passwordHistory    Json?
+  failedLoginCount   Int       @default(0)
+  lockedUntil        DateTime?
+
+  // ── Optional per-tenant custom role ────────────────────────────
+  tenantRoleId       String?
+  tenantRole         TenantRole? @relation(fields: [tenantRoleId], references: [id], onDelete: SetNull)
+
+  // ── Approval delegation (Phase 5) ──────────────────────────────
+  approvalDelegateUserId String?
+  delegateUntil          DateTime?
+
   branch        Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
   visitsHosted  Visit[]   @relation("HostToVisit")
   resetTokens   PasswordResetToken[]
+  sessions      Session[]
+  trustedDevices TrustedDevice[]
+  mfaBackupCodes MfaBackupCode[]
+  webAuthnCredentials WebAuthnCredential[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   @@index([branchId])
   @@index([email])
   @@index([role])
+  @@index([tenantRoleId])
 }
 
 model PasswordResetToken {
@@ -343,4 +375,209 @@ model AuditLog {
   @@index([actorId])
   @@index([createdAt])
   @@index([path])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Phase 3 — RBAC, sessions, MFA, security audit
+// All additive; existing endpoints keep working unchanged.
+// ─────────────────────────────────────────────────────────────
+
+/// Per-tenant custom role — clone of a built-in Role with editable
+/// permissions and optional branch/hour scope rules.
+model TenantRole {
+  id           String   @id @default(uuid())
+  orgId        String   @db.VarChar(100)
+  slug         String   @db.VarChar(80)
+  name         String   @db.VarChar(120)
+  description  String?  @db.VarChar(500)
+  /// String[] of permission identifiers from packages/shared/rbac
+  permissions  Json
+  /// Optional runtime constraints: { branchIds?: string[], hoursOfDay?: [int,int] }
+  scopeRules   Json?
+  /// Built-in role this was forked from, for "reset to default" UX
+  builtinClone Role?
+  users        User[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([orgId, slug])
+  @@index([orgId])
+}
+
+/// Per-org password / session / MFA policy. Effective = system defaults
+/// overridden by row values. Versioned via updatedAt.
+model TenantSecurityPolicy {
+  orgId                   String   @id @db.VarChar(100)
+  passwordMinLength       Int      @default(12)
+  passwordRequireUpper    Boolean  @default(true)
+  passwordRequireLower    Boolean  @default(true)
+  passwordRequireDigit    Boolean  @default(true)
+  passwordRequireSymbol   Boolean  @default(false)
+  passwordHistoryCount    Int      @default(5)
+  passwordRotateDays      Int      @default(0)
+  sessionMaxMinutes       Int      @default(480)     // 8h
+  sessionIdleMinutes      Int      @default(120)
+  refreshTtlDays          Int      @default(30)
+  /// Override MFA-required role set
+  mfaRequiredRoles        Json?
+  /// Roles that require WebAuthn (platform passkeys) on top of TOTP
+  webauthnRequiredRoles   Json?
+  ipAllowlist             Json?    // string[] CIDR
+  ipDenylist              Json?
+  geoAllowCountries       Json?    // string[] ISO2
+  trustedDeviceTtlDays    Int      @default(30)
+  /// { ROLE: maxConcurrentSessions }
+  concurrentSessionsByRole Json?
+  loginLockoutFails       Int      @default(5)
+  loginLockoutMinutes     Int      @default(15)
+  updatedAt               DateTime @updatedAt
+  updatedBy               String?  @db.VarChar(100)
+}
+
+/// Active sessions. Refresh tokens stored hashed; access tokens stay JWT.
+/// Revocation flips revokedAt — the SessionGuard checks per request.
+model Session {
+  id               String   @id @default(uuid())
+  userId           String
+  orgId            String?  @db.VarChar(100)
+  refreshTokenHash String   @unique @db.VarChar(128)
+  issuedAt         DateTime @default(now())
+  expiresAt        DateTime
+  lastUsedAt       DateTime @default(now())
+  ip               String?  @db.VarChar(64)
+  userAgent        String?  @db.VarChar(500)
+  trustedDeviceId  String?
+  /// 'password' | 'totp' | 'webauthn' | 'backup'
+  mfaMethod        String   @default("password") @db.VarChar(20)
+  mfaVerifiedAt    DateTime?
+  revokedAt        DateTime?
+  /// 'logout' | 'admin_revoke' | 'rotation' | 'policy_violation' | 'expired'
+  revokedReason    String?  @db.VarChar(40)
+
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trustedDevice    TrustedDevice? @relation(fields: [trustedDeviceId], references: [id], onDelete: SetNull)
+
+  @@index([userId, revokedAt])
+  @@index([refreshTokenHash])
+  @@index([expiresAt])
+}
+
+/// Auth-relevant device pinning. Distinct from DeviceToken (push delivery).
+/// One TrustedDevice can produce many Sessions over its trustExpiresAt window.
+model TrustedDevice {
+  id               String   @id @default(uuid())
+  userId           String
+  name             String?  @db.VarChar(120)
+  platform         String?  @db.VarChar(40)
+  fingerprintHash  String   @db.VarChar(128)
+  firstSeenAt      DateTime @default(now())
+  lastSeenAt       DateTime @default(now())
+  lastIp           String?  @db.VarChar(64)
+  trustGrantedAt   DateTime?
+  trustExpiresAt   DateTime?
+  revokedAt        DateTime?
+
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions         Session[]
+
+  @@unique([userId, fingerprintHash])
+  @@index([userId])
+}
+
+/// One-time recovery codes for users with TOTP enabled. Hashed at rest.
+model MfaBackupCode {
+  id        String   @id @default(uuid())
+  userId    String
+  codeHash  String   @db.VarChar(128)
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+}
+
+/// Platform passkeys (TouchID, FaceID, Windows Hello) + roaming authenticators.
+model WebAuthnCredential {
+  id              String   @id @default(uuid())
+  userId          String
+  credentialId    Bytes    @unique
+  publicKey       Bytes
+  signCount       BigInt   @default(0)
+  /// JSON string[] of transports e.g. ["internal","hybrid"]
+  transports      Json?
+  deviceName      String?  @db.VarChar(120)
+  createdAt       DateTime @default(now())
+  lastUsedAt      DateTime?
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Tamper-evident security event log. EventBus subscriber writes here async.
+/// Retention default 13 months; archival via cron job to object storage.
+model SecurityAudit {
+  id              String   @id @default(uuid())
+  ts              DateTime @default(now())
+  actorId         String?  @db.VarChar(100)
+  actorEmail      String?  @db.VarChar(255)
+  orgId           String?  @db.VarChar(100)
+  branchId        String?  @db.VarChar(100)
+  /// e.g. AUTH_LOGIN_SUCCESS, RBAC_ROLE_CHANGE, TENANT_ACCESS_DENIED
+  event           String   @db.VarChar(80)
+  /// 'info' | 'warning' | 'critical'
+  severity        String   @default("info") @db.VarChar(20)
+  context         Json?
+  ip              String?  @db.VarChar(64)
+  userAgent       String?  @db.VarChar(500)
+  fingerprintHash String?  @db.VarChar(128)
+  resourceType    String?  @db.VarChar(80)
+  resourceId      String?  @db.VarChar(100)
+  /// 'allow' | 'deny' | 'challenge'
+  outcome         String   @default("allow") @db.VarChar(20)
+  /// sha256 of the previous row's rowHash + this row's serialized fields
+  /// Used to detect tampering by replaying the chain.
+  prevHash        String?  @db.VarChar(64)
+  rowHash         String?  @db.VarChar(64)
+
+  @@index([orgId, ts])
+  @@index([event, ts])
+  @@index([actorId, ts])
+  @@index([severity])
+}
+
+/// Lower-severity product analytics. Sampled on reads.
+model ActivityLog {
+  id         String   @id @default(uuid())
+  ts         DateTime @default(now())
+  userId     String?  @db.VarChar(100)
+  orgId      String?  @db.VarChar(100)
+  action     String   @db.VarChar(80)
+  path       String?  @db.VarChar(500)
+  durationMs Int?
+  status     Int?
+
+  @@index([userId, ts])
+  @@index([orgId, ts])
+  @@index([action, ts])
+}
+
+/// Login-attempt risk scoring (produced by Phase 4 detectors, schema lives here).
+model LoginRisk {
+  id              String   @id @default(uuid())
+  ts              DateTime @default(now())
+  email           String   @db.VarChar(255)
+  userId          String?  @db.VarChar(100)
+  ip              String?  @db.VarChar(64)
+  fingerprintHash String?  @db.VarChar(128)
+  level           Int      // 0..100
+  /// e.g. ["new_country","impossible_travel"]
+  signals         Json
+  /// 'allow' | 'notify' | 'challenge' | 'deny'
+  action          String   @db.VarChar(20)
+
+  @@index([email, ts])
+  @@index([userId, ts])
+  @@index([level])
 }

@@ -8,6 +8,11 @@ export interface JwtUser {
   role: string;
   orgId: string | null;
   branchId: string | null;
+  /**
+   * Effective permission set baked into the access token at issuance.
+   * Optional during the rollout — guards fall back to recomputing if absent.
+   */
+  perms?: string[];
 }
 
 export function isSuperAdmin(user: JwtUser | undefined | null): boolean {

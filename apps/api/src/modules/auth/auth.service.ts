@@ -3,6 +3,8 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../platform/prisma/prisma.service';
+import { RbacService } from '../../platform/rbac/rbac.service';
+import type { RoleName } from '@vms/shared';
 
 // --- Zero-dependency RFC 6238 TOTP (compatible with Google Authenticator) ---
 
@@ -77,6 +79,7 @@ export interface JwtPayload {
   role: string;
   orgId: string | null;
   branchId: string;
+  perms?: string[];
 }
 
 @Injectable()
@@ -84,6 +87,7 @@ export class AuthService {
   constructor(
     private jwtService: JwtService,
     private prisma: PrismaService,
+    private rbac: RbacService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -102,12 +106,21 @@ export class AuthService {
       select: { organizationId: true },
     });
 
+    // Bake effective permission set into the access token so PermissionGuard
+    // can decide without a DB hit per request. Permission changes take effect
+    // at next refresh (≤ refresh-TTL) or on explicit re-resolve.
+    const permsSet = await this.rbac.resolveForUser({
+      userId: user.id,
+      role: user.role as RoleName,
+    });
+
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
       orgId: branch?.organizationId ?? null,
       branchId: user.branchId,
+      perms: Array.from(permsSet),
     };
 
     return {

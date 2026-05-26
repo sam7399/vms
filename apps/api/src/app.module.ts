@@ -6,6 +6,7 @@ import { PrismaModule } from './platform/prisma/prisma.module';
 import { EventsModule } from './platform/events/events.module';
 import { JobsModule } from './platform/jobs/jobs.module';
 import { StorageModule } from './platform/storage/storage.module';
+import { RbacModule } from './platform/rbac/rbac.module';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { AuthModule } from './modules/auth/auth.module';
 import { VisitorsModule } from './modules/visitors/visitors.module';
@@ -37,6 +38,7 @@ import { HealthController } from './health.controller';
     EventsModule,
     JobsModule,
     StorageModule,
+    RbacModule,
     HeadcountModule,
     AuthModule,
     VisitorsModule,

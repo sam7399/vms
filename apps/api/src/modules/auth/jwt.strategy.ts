@@ -22,6 +22,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: payload.role,
       orgId: payload.orgId ?? null,
       branchId: payload.branchId ?? null,
+      perms: Array.isArray(payload.perms) ? (payload.perms as string[]) : undefined,
     };
   }
 }
