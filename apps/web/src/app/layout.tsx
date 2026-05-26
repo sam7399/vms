@@ -5,21 +5,22 @@ import { I18nProvider } from "@/lib/i18n";
 import { BrandFooter } from "@/components/brand-footer";
 import { NotificationToaster } from "@/components/notification-toaster";
 import { SosBanner } from "@/components/sos-banner";
+import { getBrand } from "@/lib/brand";
+
+const brand = getBrand();
 
 export const metadata: Metadata = {
-  title: "VMS — Visitor Management System | TSI by Personify Crafters",
-  description:
-    "Enterprise Visitor & Workforce Management — Built by Personify Crafters for The Studio Infinito.",
+  title: brand.productName + " | Built by Personify Crafters",
+  description: brand.description,
   authors: [{ name: "Personify Crafters" }],
   themeColor: "#7c3aed",
   openGraph: {
-    title: "VMS — Visitor Management System | TSI",
-    description:
-      "Enterprise visitor & workforce management by Personify Crafters for The Studio Infinito.",
+    title: brand.ogTitle,
+    description: brand.description,
     type: "website",
-    siteName: "The Studio Infinito VMS",
+    siteName: brand.shortName + " · " + brand.tagline,
   },
-  icons: { icon: "/favicon.png" },
+  icons: { icon: brand.faviconSrc },
 };
 
 export default function RootLayout({

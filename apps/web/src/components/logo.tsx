@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { getBrand } from '@/lib/brand';
 
 interface Props {
   size?: number;
@@ -11,11 +12,12 @@ interface Props {
 }
 
 export function Logo({ size = 36, showWordmark = true, href = '/', className = '' }: Props) {
+  const brand = getBrand();
   const inner = (
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
       <Image
-        src="/logo.png"
-        alt="The Studio Infinito"
+        src={brand.logoSrc}
+        alt={brand.tagline}
         width={size}
         height={size}
         priority
@@ -23,9 +25,11 @@ export function Logo({ size = 36, showWordmark = true, href = '/', className = '
       />
       {showWordmark && (
         <span className="flex flex-col leading-tight">
-          <span className="text-lg font-semibold text-white tracking-tight">VMS</span>
+          <span className="text-lg font-semibold text-white tracking-tight">
+            {brand.shortName}
+          </span>
           <span className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
-            The Studio Infinito
+            {brand.tagline}
           </span>
         </span>
       )}
