@@ -2,12 +2,22 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Download, Search, ShieldCheck, ShieldX, Star, Users, UserX } from 'lucide-react';
+import {
+  Alert,
+  Badge,
+  Button,
+  Column,
+  DataTable,
+  EmptyState,
+  Input,
+  useToast,
+} from '@vms/ui';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
-import { Search, ShieldX, ShieldCheck, Users, Download, Star } from 'lucide-react';
+import { FaceEnrollButton } from '@/components/face-enroll-button';
 import { apiGet, apiPut } from '@/lib/api';
 import { downloadCSV } from '@/lib/csv';
-import { FaceEnrollButton } from '@/components/face-enroll-button';
 import { useI18n } from '@/lib/i18n';
 
 interface Visitor {
@@ -24,15 +34,26 @@ interface Visitor {
   _count: { visits: number };
 }
 
+type FilterKey = 'all' | 'active' | 'blacklisted' | 'vip';
+
+const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'active', label: 'Active' },
+  { key: 'blacklisted', label: 'Blacklisted' },
+  { key: 'vip', label: 'VIP' },
+];
+
 export default function VisitorsListPage() {
   const { isAuthenticated, isLoading } = useAuth();
   const { t } = useI18n();
   const router = useRouter();
+  const toast = useToast();
+
   const [visitors, setVisitors] = useState<Visitor[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'active' | 'blacklisted'>('all');
+  const [filter, setFilter] = useState<FilterKey>('all');
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) router.push('/auth/login');
@@ -52,12 +73,14 @@ export default function VisitorsListPage() {
 
   async function toggleBlacklist(v: Visitor) {
     setBusyId(v.id);
-    setError(null);
     try {
       await apiPut(`/admin/visitors/${v.id}/blacklist`, { blacklist: !v.isBlacklisted });
+      toast.success(
+        v.isBlacklisted ? `${v.fullName} removed from blacklist` : `${v.fullName} blacklisted`,
+      );
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Update failed');
+      toast.error('Update failed', e instanceof Error ? e.message : undefined);
     } finally {
       setBusyId(null);
     }
@@ -65,23 +88,24 @@ export default function VisitorsListPage() {
 
   async function toggleVip(v: Visitor) {
     setBusyId(v.id);
-    setError(null);
     try {
       await apiPut(`/visitors/${v.id}/vip`, { isVip: !v.isVip });
+      toast.success(v.isVip ? `${v.fullName} unmarked VIP` : `${v.fullName} marked VIP`);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Update failed');
+      toast.error('Update failed', e instanceof Error ? e.message : undefined);
     } finally {
       setBusyId(null);
     }
   }
 
   const filtered = useMemo(() => {
-    if (!visitors) return [];
+    if (!visitors) return [] as Visitor[];
     const q = search.trim().toLowerCase();
     return visitors.filter((v) => {
       if (filter === 'active' && v.isBlacklisted) return false;
       if (filter === 'blacklisted' && !v.isBlacklisted) return false;
+      if (filter === 'vip' && !v.isVip) return false;
       if (!q) return true;
       return (
         v.fullName.toLowerCase().includes(q) ||
@@ -93,10 +117,108 @@ export default function VisitorsListPage() {
     });
   }, [visitors, search, filter]);
 
+  const columns: Column<Visitor>[] = [
+    {
+      key: 'visitor',
+      header: 'Visitor',
+      cell: (v) => (
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-text-primary font-medium truncate">{v.fullName}</span>
+            {v.isVip && (
+              <Star className="w-3.5 h-3.5 shrink-0 text-warning fill-warning" aria-label="VIP" />
+            )}
+          </div>
+          <p className="text-xs text-text-tertiary truncate">
+            <span className="font-mono">{v.phone}</span>
+            {v.email && <span> · {v.email}</span>}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: 'company',
+      header: 'Company',
+      priority: 2,
+      cell: (v) =>
+        v.company ? (
+          <span className="text-text-secondary">{v.company}</span>
+        ) : (
+          <span className="text-text-tertiary">—</span>
+        ),
+    },
+    {
+      key: 'document',
+      header: 'Document',
+      priority: 3,
+      cell: (v) => (
+        <div>
+          <p className="text-xs text-text-tertiary uppercase tracking-wider">{v.documentType}</p>
+          <p className="text-xs font-mono text-text-secondary">{v.documentNumber}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'visits',
+      header: 'Visits',
+      align: 'center',
+      width: '80px',
+      cell: (v) => (
+        <Badge tone="brand" mono>
+          {v._count.visits}
+        </Badge>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      width: '120px',
+      cell: (v) =>
+        v.isBlacklisted ? (
+          <Badge tone="danger" icon={<ShieldX />}>
+            Blacklisted
+          </Badge>
+        ) : (
+          <Badge tone="success" icon={<ShieldCheck />}>
+            Active
+          </Badge>
+        ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      cell: (v) => (
+        <div className="flex justify-end items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <FaceEnrollButton kind="visitor" id={v.id} label="Face" />
+          <Button
+            variant={v.isVip ? 'secondary' : 'ghost'}
+            size="sm"
+            disabled={busyId === v.id}
+            onClick={() => toggleVip(v)}
+            leftIcon={<Star className={v.isVip ? 'fill-warning text-warning' : ''} />}
+            className={v.isVip ? 'text-warning' : ''}
+            title={v.isVip ? t('visitors.unmarkVip') : t('visitors.markVip')}
+          >
+            VIP
+          </Button>
+          <Button
+            variant={v.isBlacklisted ? 'success' : 'danger'}
+            size="sm"
+            disabled={busyId === v.id}
+            onClick={() => toggleBlacklist(v)}
+          >
+            {v.isBlacklisted ? t('visitors.unblacklist') : t('visitors.blacklist')}
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   if (isLoading || !isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-zinc-400">Loading…</div>
+      <div className="min-h-screen flex items-center justify-center text-text-tertiary text-sm">
+        Loading…
       </div>
     );
   }
@@ -105,170 +227,90 @@ export default function VisitorsListPage() {
     <main className="min-h-screen">
       <DashboardHeader />
 
-      <div className="max-w-7xl mx-auto px-6 py-12">
-        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Page header */}
+        <div className="flex items-end justify-between gap-4 flex-wrap mb-6">
           <div>
-            <div className="flex items-center gap-3">
-              <Users className="w-7 h-7 text-blue-400" />
-              <h2 className="text-3xl font-bold text-white">{t('visitors.title')}</h2>
+            <div className="flex items-center gap-2.5">
+              <Users className="w-5 h-5 text-brand-400" />
+              <h1 className="text-xl font-semibold text-text-primary">{t('visitors.title')}</h1>
               {visitors && (
-                <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-300 text-sm">
+                <Badge tone="brand" mono>
                   {visitors.length}
-                </span>
+                </Badge>
               )}
             </div>
-            <p className="text-zinc-400 mt-2">
-              {t('visitors.subtitle')}
-            </p>
+            <p className="text-sm text-text-tertiary mt-1">{t('visitors.subtitle')}</p>
           </div>
           {filtered.length > 0 && (
-            <button
+            <Button
+              variant="secondary"
+              size="md"
+              leftIcon={<Download />}
               onClick={() =>
                 downloadCSV(
-                  `vms-visitors-${new Date().toISOString().slice(0, 10)}.csv`,
+                  `aegis-visitors-${new Date().toISOString().slice(0, 10)}.csv`,
                   filtered as any,
                 )
               }
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors"
             >
-              <Download className="w-4 h-4" /> Export CSV
-            </button>
+              Export CSV
+            </Button>
           )}
         </div>
 
         {error && (
-          <div className="mb-4 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-200 text-sm">
+          <Alert tone="danger" onDismiss={() => setError(null)} className="mb-4">
             {error}
-          </div>
+          </Alert>
         )}
 
-        <div className="mb-6 flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-[240px]">
-            <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, phone, email, company, document…"
-              className="w-full pl-9 pr-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        <DataTable<Visitor>
+          rows={filtered}
+          columns={columns}
+          rowKey={(v) => v.id}
+          density="compact"
+          loading={!visitors}
+          maxHeight="calc(100vh - 280px)"
+          toolbar={
+            <>
+              <div className="flex-1 min-w-[240px] max-w-md">
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by name, phone, email, company, document…"
+                  prefix={<Search className="w-3.5 h-3.5" />}
+                />
+              </div>
+              <div className="flex items-center gap-1 bg-surface-1 border border-border-subtle rounded-md p-0.5">
+                {FILTER_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.key}
+                    onClick={() => setFilter(opt.key)}
+                    className={`px-2.5 h-6 rounded text-xs font-medium transition-colors duration-fast ${
+                      filter === opt.key
+                        ? 'bg-brand-600 text-white'
+                        : 'text-text-tertiary hover:text-text-primary'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          }
+          empty={
+            <EmptyState
+              icon={search || filter !== 'all' ? <Search /> : <UserX />}
+              title={search || filter !== 'all' ? 'No matches' : 'No visitors yet'}
+              description={
+                search || filter !== 'all'
+                  ? 'Adjust your search or filter to see results.'
+                  : 'Create one via the check-in flow or kiosk.'
+              }
             />
-          </div>
-          <div className="flex gap-1 rounded-lg bg-white/5 p-1">
-            {(['all', 'active', 'blacklisted'] as const).map((opt) => (
-              <button
-                key={opt}
-                onClick={() => setFilter(opt)}
-                className={`px-3 py-1.5 rounded text-xs font-medium capitalize transition-colors ${
-                  filter === opt
-                    ? 'bg-blue-600 text-white'
-                    : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden">
-          {!visitors && <div className="p-6 text-zinc-500">Loading…</div>}
-          {visitors && filtered.length === 0 && (
-            <div className="p-8 text-center text-zinc-500 text-sm">
-              {search || filter !== 'all'
-                ? 'No visitors match the current filter.'
-                : 'No visitors yet. Create one via the check-in or kiosk.'}
-            </div>
-          )}
-          {filtered.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-xs text-zinc-400 uppercase border-b border-white/10">
-                  <tr>
-                    <th className="text-left p-4">Visitor</th>
-                    <th className="text-left p-4">Company</th>
-                    <th className="text-left p-4">Document</th>
-                    <th className="text-left p-4">Visits</th>
-                    <th className="text-left p-4">Status</th>
-                    <th className="text-left p-4"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {filtered.map((v) => (
-                    <tr
-                      key={v.id}
-                      className={`hover:bg-white/5 ${v.isBlacklisted ? 'bg-red-500/5' : ''}`}
-                    >
-                      <td className="p-4">
-                        <p className="font-medium text-white flex items-center gap-1.5">
-                          {v.fullName}
-                          {v.isVip && (
-                            <Star
-                              className="w-3.5 h-3.5 text-amber-300 fill-amber-300"
-                              aria-label="VIP"
-                            />
-                          )}
-                        </p>
-                        <p className="text-xs text-zinc-500">
-                          {v.phone} {v.email && `· ${v.email}`}
-                        </p>
-                      </td>
-                      <td className="p-4 text-zinc-300">{v.company ?? '—'}</td>
-                      <td className="p-4">
-                        <p className="text-xs text-zinc-400">{v.documentType}</p>
-                        <p className="text-xs font-mono text-zinc-300">{v.documentNumber}</p>
-                      </td>
-                      <td className="p-4">
-                        <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-300 text-xs font-medium">
-                          {v._count.visits}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        {v.isBlacklisted ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-500/15 text-red-300 text-xs">
-                            <ShieldX className="w-3 h-3" /> Blacklisted
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-500/10 text-green-300 text-xs">
-                            <ShieldCheck className="w-3 h-3" /> Active
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="flex justify-end gap-2 flex-wrap">
-                          <FaceEnrollButton kind="visitor" id={v.id} label="Face" />
-                          <button
-                            onClick={() => toggleVip(v)}
-                            disabled={busyId === v.id}
-                            className={`px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50 inline-flex items-center gap-1 ${
-                              v.isVip
-                                ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200'
-                                : 'bg-white/5 hover:bg-white/10 text-zinc-300'
-                            }`}
-                            title={v.isVip ? t('visitors.unmarkVip') : t('visitors.markVip')}
-                          >
-                            <Star className={`w-3 h-3 ${v.isVip ? 'fill-amber-300' : ''}`} />
-                            VIP
-                          </button>
-                          <button
-                            onClick={() => toggleBlacklist(v)}
-                            disabled={busyId === v.id}
-                            className={`px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50 ${
-                              v.isBlacklisted
-                                ? 'bg-green-600/80 hover:bg-green-600 text-white'
-                                : 'bg-red-600/80 hover:bg-red-600 text-white'
-                            }`}
-                          >
-                            {v.isBlacklisted ? t('visitors.unblacklist') : t('visitors.blacklist')}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+          }
+        />
       </div>
     </main>
   );

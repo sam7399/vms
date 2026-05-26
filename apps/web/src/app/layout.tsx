@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { I18nProvider } from "@/lib/i18n";
+import { ToastProvider } from "@vms/ui";
 import { BrandFooter } from "@/components/brand-footer";
 import { NotificationToaster } from "@/components/notification-toaster";
 import { SosBanner } from "@/components/sos-banner";
@@ -39,7 +40,8 @@ export default function RootLayout({
       </head>
       <body suppressHydrationWarning className="bg-surface-0 text-text-primary">
         <I18nProvider>
-          <AuthProvider>
+          <ToastProvider>
+            <AuthProvider>
             <div className="relative min-h-screen flex flex-col bg-surface-950 text-white overflow-x-hidden">
               {/* Ambient brand backdrop */}
               <div
@@ -55,7 +57,8 @@ export default function RootLayout({
             </div>
             <SosBanner />
             <NotificationToaster />
-          </AuthProvider>
+            </AuthProvider>
+          </ToastProvider>
         </I18nProvider>
       </body>
     </html>
