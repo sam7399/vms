@@ -11,7 +11,7 @@ const TONE: Record<Tone, { container: string; icon: string }> = {
   critical: { container: 'bg-critical/[0.10] border-critical/45 text-critical', icon: 'text-critical' },
 };
 
-interface AlertProps extends HTMLAttributes<HTMLDivElement> {
+interface AlertProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   tone?: Tone;
   title?: ReactNode;
   icon?: ReactNode;

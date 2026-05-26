@@ -1,7 +1,7 @@
 import { forwardRef, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes, SelectHTMLAttributes } from 'react';
 import { cn } from '../utils/cn';
 
-interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'prefix' | 'suffix'> {
   prefix?: ReactNode;
   suffix?: ReactNode;
   invalid?: boolean;

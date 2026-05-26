@@ -18,7 +18,7 @@ const SIZE: Record<Size, string> = {
   lg: 'text-display',
 };
 
-interface StatProps extends HTMLAttributes<HTMLDivElement> {
+interface StatProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   label: ReactNode;
   value: ReactNode;
   delta?: ReactNode;

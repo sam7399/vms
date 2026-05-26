@@ -1,7 +1,7 @@
 import { HTMLAttributes, ReactNode } from 'react';
 import { cn } from '../utils/cn';
 
-interface EmptyStateProps extends HTMLAttributes<HTMLDivElement> {
+interface EmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   icon?: ReactNode;
   title?: ReactNode;
   description?: ReactNode;

@@ -74,7 +74,7 @@ const SurfaceRoot = forwardRef<HTMLDivElement, SurfaceProps>(
 );
 SurfaceRoot.displayName = 'Surface';
 
-interface SectionProps extends HTMLAttributes<HTMLDivElement> {
+interface SectionProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   eyebrow?: ReactNode;
   title?: ReactNode;
   trailing?: ReactNode;
