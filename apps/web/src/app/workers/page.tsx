@@ -75,7 +75,9 @@ function WorkersPageInner() {
     pfNumber: '',
     esicNumber: '',
     hourlyRate: '',
+    enrollFace: true,
   });
+  const [enrollForId, setEnrollForId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) router.push('/auth/login');
@@ -152,9 +154,11 @@ function WorkersPageInner() {
     setError('');
     try {
       const payload: any = { ...form };
+      delete payload.enrollFace;
       if (form.hourlyRate) payload.hourlyRate = parseFloat(form.hourlyRate);
       else delete payload.hourlyRate;
-      await apiPost('/admin/workers', payload);
+      const created = await apiPost<{ id: string }>('/admin/workers', payload);
+      const wantEnroll = form.enrollFace;
       setForm({
         contractorId: contractorFilter,
         fullName: '',
@@ -167,9 +171,12 @@ function WorkersPageInner() {
         pfNumber: '',
         esicNumber: '',
         hourlyRate: '',
+        enrollFace: true,
       });
       setShowForm(false);
       await loadWorkers();
+      // One-step enroll: pop the camera for the worker we just created.
+      if (wantEnroll && created?.id) setEnrollForId(created.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Create failed');
     } finally {
@@ -338,6 +345,14 @@ function WorkersPageInner() {
               />
               Police verified
             </label>
+            <label className="flex items-center gap-2 text-white text-sm">
+              <input
+                type="checkbox"
+                checked={form.enrollFace}
+                onChange={(e) => setForm({ ...form, enrollFace: e.target.checked })}
+              />
+              Capture face now (for face-gate recognition)
+            </label>
 
             <input
               type="text"
@@ -503,6 +518,17 @@ function WorkersPageInner() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* One-step enroll: opens the camera for a freshly-created worker */}
+      {enrollForId && (
+        <FaceEnrollButton
+          kind="worker"
+          id={enrollForId}
+          autoStart
+          onEnrolled={loadWorkers}
+          onClose={() => setEnrollForId(null)}
+        />
       )}
     </main>
   );

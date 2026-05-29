@@ -12,6 +12,10 @@ interface Props {
   label?: string;
   /** Called after successful enrollment. */
   onEnrolled?: () => void;
+  /** Open the camera immediately on mount; renders no trigger button. */
+  autoStart?: boolean;
+  /** Called when the modal closes (used with autoStart for one-step flows). */
+  onClose?: () => void;
 }
 
 type State =
@@ -23,7 +27,7 @@ type State =
   | { kind: 'done' }
   | { kind: 'error'; message: string };
 
-export function FaceEnrollButton({ kind, id, label, onEnrolled }: Props) {
+export function FaceEnrollButton({ kind, id, label, onEnrolled, autoStart, onClose }: Props) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<State>({ kind: 'idle' });
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -32,6 +36,11 @@ export function FaceEnrollButton({ kind, id, label, onEnrolled }: Props) {
   useEffect(() => {
     return () => stopCamera();
   }, []);
+
+  useEffect(() => {
+    if (autoStart) start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart]);
 
   async function start() {
     setOpen(true);
@@ -77,6 +86,7 @@ export function FaceEnrollButton({ kind, id, label, onEnrolled }: Props) {
     stopCamera();
     setOpen(false);
     setState({ kind: 'idle' });
+    onClose?.();
   }
 
   async function capture() {
@@ -100,6 +110,8 @@ export function FaceEnrollButton({ kind, id, label, onEnrolled }: Props) {
   }
 
   if (!open) {
+    // In autoStart mode we render no trigger button — the modal opens itself.
+    if (autoStart) return null;
     return (
       <button
         type="button"
