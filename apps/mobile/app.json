@@ -42,7 +42,7 @@
       "color": "#7c3aed"
     },
     "extra": {
-      "apiUrl": "https://vms-api-gxep.onrender.com",
+      "apiUrl": "https://vms-api-production.up.railway.app",
       "eas": {
         "projectId": "5c43255e-779b-4f30-a92f-51bb6a92df58"
       }
