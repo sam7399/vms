@@ -581,3 +581,106 @@ model LoginRisk {
   @@index([userId, ts])
   @@index([level])
 }
+
+// ─────────────────────────────────────────────────────────────
+// Phase 4 — Intelligence: Alerts & Incidents
+// Honest scope: rule-based + statistical signals over the event bus.
+// No fabricated CV. Camera/zone tables land in Phase 5 (surveillance).
+// ─────────────────────────────────────────────────────────────
+
+/// A single atomic signal raised by a detector. Many alerts may roll up
+/// into one Incident via the AlertAggregator.
+model Alert {
+  id          String   @id @default(uuid())
+  /// detector slug, e.g. 'blacklist-face', 'after-hours', 'unauthorized-entry'
+  type        String   @db.VarChar(60)
+  severity    Int      @default(2)   // 1..5
+  orgId       String?  @db.VarChar(100)
+  branchId    String?  @db.VarChar(100)
+  /// 'visitor' | 'worker' | 'user' | 'unknown'
+  actorType   String?  @db.VarChar(20)
+  actorId     String?  @db.VarChar(100)
+  actorName   String?  @db.VarChar(255)
+  /// the events / context that triggered the alert
+  evidence    Json?
+  /// 'open' | 'acknowledged' | 'resolved' | 'dismissed'
+  status      String   @default("open") @db.VarChar(20)
+  raisedAt    DateTime @default(now())
+  ackedAt     DateTime?
+  ackedBy     String?  @db.VarChar(100)
+  resolvedAt  DateTime?
+  incidentId  String?
+
+  incident    Incident? @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, raisedAt])
+  @@index([branchId, status])
+  @@index([type])
+  @@index([status])
+  @@index([incidentId])
+}
+
+/// An investigative case grouping correlated alerts.
+model Incident {
+  id            String   @id @default(uuid())
+  orgId         String?  @db.VarChar(100)
+  branchId      String?  @db.VarChar(100)
+  /// max severity of member alerts, 1..5
+  severity      Int      @default(2)
+  /// dominant detector category, e.g. 'access.unauthorized'
+  kind          String   @db.VarChar(60)
+  title         String   @db.VarChar(200)
+  summary       String?  @db.VarChar(2000)
+  /// 'open' | 'investigating' | 'resolved' | 'false_positive'
+  status        String   @default("open") @db.VarChar(20)
+  assignedTo    String?  @db.VarChar(100)
+  resolution    String?  @db.VarChar(2000)
+  resolvedBy    String?  @db.VarChar(100)
+  /// snapshot of headcount / context when opened
+  metricsAtOpen Json?
+  openedAt      DateTime @default(now())
+  closedAt      DateTime?
+  updatedAt     DateTime @updatedAt
+
+  alerts        Alert[]
+  timeline      IncidentTimelineEntry[]
+
+  @@index([orgId, openedAt])
+  @@index([branchId, status])
+  @@index([status])
+  @@index([severity])
+}
+
+/// Append-only investigative trail per incident.
+model IncidentTimelineEntry {
+  id         String   @id @default(uuid())
+  incidentId String
+  ts         DateTime @default(now())
+  /// 'ALERT_ADDED' | 'NOTE' | 'ASSIGN' | 'ACK' | 'ESCALATE' | 'RESOLVE' | 'CLIP_ATTACHED'
+  kind       String   @db.VarChar(40)
+  actorId    String?  @db.VarChar(100)
+  actorName  String?  @db.VarChar(255)
+  payload    Json?
+
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId, ts])
+}
+
+/// Per-tenant detector configuration. Defaults live in code; rows override.
+model DetectorConfig {
+  id              String   @id @default(uuid())
+  orgId           String   @db.VarChar(100)
+  /// detector slug
+  slug            String   @db.VarChar(60)
+  enabled         Boolean  @default(true)
+  severityOverride Int?
+  /// detector-specific thresholds, e.g. { windowSec: 10, minCount: 3 }
+  thresholds      Json?
+  /// suppress duplicate alerts for N minutes
+  suppressMinutes Int      @default(5)
+  updatedAt       DateTime @updatedAt
+
+  @@unique([orgId, slug])
+  @@index([orgId])
+}

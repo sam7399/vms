@@ -89,6 +89,44 @@ export interface HeadcountInvalidatedPayload {
   ts: string;
 }
 
+/// Emitted whenever a QR scan is attempted at a gate — even rejected ones.
+/// Detectors (scan-spam, unauthorized-entry) subscribe to this.
+export interface GateScanPayload {
+  branchId?: string;
+  gateId?: string;
+  /// 'approved' | 'rejected' | 'unknown'
+  outcome: string;
+  /// reason for rejection, when applicable
+  reason?: string;
+  visitId?: string;
+  visitorId?: string;
+  visitorName?: string;
+  ts: string;
+}
+
+/// Emitted by the face pipeline after a 1:N identify.
+export interface FaceObservedPayload {
+  branchId?: string;
+  matched: boolean;
+  kind?: 'visitor' | 'worker';
+  matchedId?: string;
+  matchedName?: string;
+  /// true when the matched visitor is blacklisted
+  blacklisted?: boolean;
+  distance?: number;
+  ts: string;
+}
+
+/// Emitted by the AlertAggregator once an alert is persisted.
+export interface AlertRaisedPayload {
+  alertId: string;
+  orgId?: string;
+  branchId?: string;
+  type: string;
+  severity: number;
+  ts: string;
+}
+
 export interface AppEventPayloads {
   'visit.walked_in': WalkInPayload;
   'visit.decided': ApprovalDecisionPayload;
@@ -101,6 +139,9 @@ export interface AppEventPayloads {
   'notice.posted': NoticePostedPayload;
   'notice.removed': NoticeRemovedPayload;
   'headcount.invalidated': HeadcountInvalidatedPayload;
+  'gate.scan': GateScanPayload;
+  'face.observed': FaceObservedPayload;
+  'alert.raised': AlertRaisedPayload;
 }
 
 export type AppEventName = keyof AppEventPayloads;

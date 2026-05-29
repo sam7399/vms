@@ -276,8 +276,20 @@ export class GateService {
       throw new NotFoundException('Invalid QR token');
     }
 
+    const scan = (outcome: string, reason?: string) =>
+      this.events.emit('gate.scan', {
+        branchId: visit.branchId,
+        outcome,
+        reason,
+        visitId: visit.id,
+        visitorId: visit.visitorId,
+        visitorName: visit.visitor.fullName,
+        ts: new Date().toISOString(),
+      });
+
     // Blacklist check — visitor record OR visit status
     if (visit.visitor.isBlacklisted) {
+      scan('rejected', 'blacklist');
       throw new BadRequestException(
         `Visitor ${visit.visitor.fullName} is blacklisted — entry denied`,
       );
@@ -294,10 +306,12 @@ export class GateService {
     }
 
     if (visit.status === VisitStatus.REJECTED || visit.status === VisitStatus.BLACKLISTED) {
+      scan('rejected', `reject:${visit.status}`);
       throw new BadRequestException(`Visit is ${visit.status}`);
     }
 
     if (visit.status === VisitStatus.PENDING) {
+      scan('rejected', 'pending approval');
       throw new BadRequestException(
         'Visit is still awaiting host approval — ask your host to approve first',
       );
@@ -312,6 +326,7 @@ export class GateService {
     });
 
     const ts = new Date().toISOString();
+    scan('approved');
     this.events.emit('visit.checked_in', {
       branchId: updated.branchId,
       kind: 'visitor',
