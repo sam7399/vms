@@ -20,7 +20,7 @@ export function DashboardHeader() {
   if (!user) return null;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-surface-950/85 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-border-subtle bg-surface-1 shadow-sm">
       <div className="mx-auto max-w-7xl px-6 py-3">
         <div className="flex items-center justify-between gap-6">
           <Logo />

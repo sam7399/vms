@@ -18,7 +18,7 @@ export function TopBar({ onOpenCommand }: Props) {
   if (!user) return null;
 
   return (
-    <header className="sticky top-0 z-20 h-14 border-b border-border-subtle bg-surface-1/85 backdrop-blur-xl">
+    <header className="sticky top-0 z-20 h-14 border-b border-border-subtle bg-surface-1">
       <div className="h-full px-4 sm:px-6 flex items-center gap-3 sm:gap-4">
         {/* Branch chip — placeholder; wired to real data later */}
         <div className="hidden sm:flex items-center gap-2 px-2.5 h-8 rounded-md bg-surface-2 border border-border-subtle text-sm text-text-secondary">

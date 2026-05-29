@@ -124,8 +124,8 @@ export function NavMenu() {
               />
             </button>
             {isOpen && (
-              <div className="absolute top-full left-0 mt-1.5 min-w-[230px] rounded-xl border border-white/[0.08] bg-surface-900/95 backdrop-blur-xl shadow-2xl shadow-brand-500/10 py-2 z-50 overflow-hidden">
-                <div className="px-3 pb-2 text-[10px] uppercase tracking-wider text-zinc-500 border-b border-white/[0.04] mb-1">
+              <div className="absolute top-full left-0 mt-1.5 min-w-[230px] rounded-xl border border-border-strong bg-surface-2 shadow-2xl shadow-black/50 py-2 z-50 overflow-hidden">
+                <div className="px-3 pb-2 text-[10px] uppercase tracking-wider text-text-tertiary border-b border-border-subtle mb-1">
                   {t(cat.key)}
                 </div>
                 {cat.items.map((it) => (
@@ -133,7 +133,7 @@ export function NavMenu() {
                     key={it.href}
                     href={it.href}
                     onClick={() => setOpen(null)}
-                    className="block px-4 py-2 text-sm text-zinc-300 hover:bg-brand-500/10 hover:text-white"
+                    className="block px-4 py-2 text-sm text-text-secondary hover:bg-brand-500/15 hover:text-text-primary"
                   >
                     {t(it.key)}
                   </Link>

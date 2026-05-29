@@ -22,7 +22,7 @@ export function SideRail({ expanded, onToggle }: Props) {
     <aside
       data-expanded={expanded}
       className={cn(
-        'hidden md:flex fixed inset-y-0 left-0 z-30 flex-col border-r border-border-subtle bg-surface-1/85 backdrop-blur-xl transition-[width] duration-normal ease-standard',
+        'hidden md:flex fixed inset-y-0 left-0 z-30 flex-col border-r border-border-subtle bg-surface-1 transition-[width] duration-normal ease-standard',
         expanded ? 'w-60' : 'w-16',
       )}
     >
