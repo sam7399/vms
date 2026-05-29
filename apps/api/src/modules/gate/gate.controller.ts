@@ -11,16 +11,26 @@ import type { JwtUser } from '../../common/tenant';
 export class GateController {
   constructor(private gateService: GateService) {}
 
-  // Public — kiosk + mobile use this
+  // Public — kiosk/mobile post a face embedding; engine identifies +
+  // applies entry rules and auto checks-in, or returns a denial the
+  // gateman can override.
   @Post('face-entry')
-  async processFaceEntry(
-    @Body() body: { gateId: string; branchId: string; capturedEmbedding: Buffer },
+  async faceEntry(
+    @Body() body: { embedding: number[]; gateId?: string; branchId?: string },
   ) {
-    return this.gateService.processFaceEntry(
-      body.gateId,
-      body.branchId,
-      body.capturedEmbedding,
-    );
+    return this.gateService.faceEntry(body?.embedding, body?.gateId, body?.branchId);
+  }
+
+  // Authenticated — gateman forces entry after a denial. Logged as a
+  // security override (raises an incident with guard identity + reason).
+  @Post('face-entry/override')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER, Role.SECURITY_GUARD)
+  faceEntryOverride(
+    @CurrentUser() user: JwtUser,
+    @Body() body: { kind: 'worker' | 'visitor'; id: string; gateId?: string; branchId?: string; reason: string },
+  ) {
+    return this.gateService.faceEntryOverride(user, body);
   }
 
   // Public — kiosk + mobile use this

@@ -7,13 +7,19 @@ import {
 import { VisitStatus } from '@prisma/client';
 import { PrismaService } from '../../platform/prisma/prisma.service';
 import { EventBus } from '../../platform/events/event-bus';
+import { FaceService } from '../face/face.service';
 import { JwtUser, isSuperAdmin, workerScope } from '../../common/tenant';
+
+// Auto-grant only on a tight match; looser matches still identify the person
+// but a human (compliance gate / gateman) makes the final call.
+const AUTO_GRANT_DISTANCE = 0.5;
 
 @Injectable()
 export class GateService {
   constructor(
     private readonly events: EventBus,
     private readonly prisma: PrismaService,
+    private readonly face: FaceService,
   ) {}
 
   private emitWorkerEvent(kind: 'in' | 'out', branchId: string, workerId: string, workerName: string) {
@@ -192,69 +198,157 @@ export class GateService {
     };
   }
 
-  // Mock face embedding comparison (in production, use TensorFlow/OpenCV)
-  private compareFaceEmbeddings(embedding1: any, embedding2: any): number {
-    if (!embedding1 || !embedding2) return 0;
-    return Math.random() * 0.3 + 0.7; // Mock: 70-100% similarity
+  /**
+   * Face-gate entry. The visitor/worker stands at the camera; the client
+   * (kiosk/mobile) computes the 128-d embedding via face-api.js and posts it.
+   *
+   * Decision flow:
+   *   - identify the embedding (1:N, threshold 0.6)
+   *   - no match           → { decision: 'unmatched' }  (register them)
+   *   - worker, compliant  → auto check-in (toggle)  → { decision: 'granted' }
+   *   - worker, blocked    → { decision: 'denied', reason } — gateman can override
+   *   - visitor, approved  → auto check-in            → { decision: 'granted' }
+   *   - visitor, no pass   → { decision: 'denied', reason }
+   *
+   * Public surface (kiosk). Override is the authenticated path below.
+   */
+  async faceEntry(embedding: number[], gateId = 'face-gate', branchId?: string) {
+    const match: any = await this.face.identify(embedding, 0.6);
+    if (!match?.matched) {
+      this.events.emit('face.observed', {
+        branchId, matched: false, distance: match?.bestDistance, ts: new Date().toISOString(),
+      });
+      return { decision: 'unmatched' as const, reason: match?.reason ?? 'Face not recognized' };
+    }
+
+    this.events.emit('face.observed', {
+      branchId,
+      matched: true,
+      kind: match.kind,
+      matchedId: match.id,
+      matchedName: match.name,
+      blacklisted: !!match.meta?.isBlacklisted,
+      distance: match.distance,
+      ts: new Date().toISOString(),
+    });
+
+    const lowConfidence = match.distance > AUTO_GRANT_DISTANCE;
+
+    if (match.kind === 'worker') {
+      return this.faceEntryWorker(match, gateId, branchId, lowConfidence);
+    }
+    return this.faceEntryVisitor(match, lowConfidence);
   }
 
-  async processFaceEntry(gateId: string, branchId: string, capturedEmbedding: Buffer) {
-    const CONFIDENCE_THRESHOLD = 0.85;
-
-    // Get active workers
-    const activeWorkers = await this.prisma.worker.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        fullName: true,
-        faceData: true,
-        medicalExpiry: true,
-        policeVerified: true,
-        contractorId: true,
-      },
+  private async faceEntryWorker(match: any, gateId: string, branchId: string | undefined, lowConfidence: boolean) {
+    const worker = await this.prisma.worker.findUnique({
+      where: { id: match.id },
+      include: { contractor: { select: { companyName: true } } },
     });
+    if (!worker) return { decision: 'unmatched' as const, reason: 'Worker record missing' };
 
-    let matchedWorker = null;
-    for (const worker of activeWorkers) {
-      if (worker.faceData) {
-        const similarity = this.compareFaceEmbeddings(capturedEmbedding, worker.faceData);
-        if (similarity >= CONFIDENCE_THRESHOLD) {
-          matchedWorker = worker;
-          break;
-        }
-      }
+    const reasons: string[] = [];
+    if (!worker.isActive) reasons.push('Worker is inactive');
+    if (!worker.policeVerified) reasons.push('Police verification incomplete');
+    if (new Date(worker.medicalExpiry) < new Date()) reasons.push('Medical certificate expired');
+    if (lowConfidence) reasons.push('Low face-match confidence');
+
+    if (reasons.length > 0) {
+      return {
+        decision: 'denied' as const,
+        kind: 'worker' as const,
+        id: worker.id,
+        name: worker.fullName,
+        contractor: worker.contractor.companyName,
+        distance: match.distance,
+        reasons,
+        canOverride: true,
+      };
     }
 
-    if (!matchedWorker) {
-      return { success: false, message: 'Face not recognized' };
-    }
+    const result = await this.toggleWorkerAttendance(worker.id, worker.fullName, gateId, branchId);
+    return { decision: 'granted' as const, kind: 'worker' as const, id: worker.id, name: worker.fullName, distance: match.distance, ...result };
+  }
 
-    // Check compliance
-    if (!matchedWorker.policeVerified) {
-      return { success: false, message: 'Police verification incomplete' };
+  private async faceEntryVisitor(match: any, lowConfidence: boolean) {
+    if (match.meta?.isBlacklisted) {
+      return { decision: 'denied' as const, kind: 'visitor' as const, id: match.id, name: match.name, reasons: ['Visitor is blacklisted'], canOverride: false };
     }
-
-    if (new Date() > matchedWorker.medicalExpiry) {
-      return { success: false, message: 'Medical certificate expired' };
-    }
-
-    // Log attendance
-    const attendance = await this.prisma.attendance.create({
-      data: {
-        workerId: matchedWorker.id,
-        branchId,
-        gateId,
-        checkIn: new Date(),
-      },
+    const visit = await this.prisma.visit.findFirst({
+      where: { visitorId: match.id, status: { in: [VisitStatus.APPROVED, VisitStatus.CHECKED_IN] } },
+      orderBy: { expectedEntry: 'desc' },
     });
+    if (!visit) {
+      return { decision: 'denied' as const, kind: 'visitor' as const, id: match.id, name: match.name, reasons: ['No approved visit on file'], canOverride: true };
+    }
+    if (lowConfidence) {
+      return { decision: 'denied' as const, kind: 'visitor' as const, id: match.id, name: match.name, visitId: visit.id, reasons: ['Low face-match confidence'], canOverride: true };
+    }
+    const res = await this.checkInByQrToken(visit.qrCodeToken);
+    return { decision: 'granted' as const, kind: 'visitor' as const, id: match.id, name: match.name, distance: match.distance, ...res };
+  }
 
-    return {
-      success: true,
-      message: 'Access granted',
-      workerId: matchedWorker.id,
-      workerName: matchedWorker.fullName,
-      attendanceId: attendance.id,
-    };
+  /** Toggle worker attendance in/out by id (used by face-gate + override). */
+  private async toggleWorkerAttendance(workerId: string, workerName: string, gateId: string, branchId?: string) {
+    const open = await this.prisma.attendance.findFirst({ where: { workerId, checkOut: null } });
+    if (open) {
+      const updated = await this.prisma.attendance.update({ where: { id: open.id }, data: { checkOut: new Date() } });
+      this.emitWorkerEvent('out', updated.branchId, workerId, workerName);
+      return { action: 'checked-out' as const, attendanceId: updated.id, checkedOutAt: updated.checkOut };
+    }
+    const chosenBranch = branchId ?? (await this.prisma.branch.findFirst())?.id;
+    if (!chosenBranch) throw new BadRequestException('No branch available');
+    const att = await this.prisma.attendance.create({
+      data: { workerId, branchId: chosenBranch, gateId, checkIn: new Date() },
+    });
+    this.emitWorkerEvent('in', chosenBranch, workerId, workerName);
+    return { action: 'checked-in' as const, attendanceId: att.id, checkedInAt: att.checkIn };
+  }
+
+  /**
+   * Gateman override — force entry for a face-gate denial. Authenticated
+   * (security roles only). Logs a security-relevant override event so it
+   * surfaces as an incident, with the guard's identity + reason on record.
+   */
+  async faceEntryOverride(
+    user: JwtUser,
+    body: { kind: 'worker' | 'visitor'; id: string; gateId?: string; branchId?: string; reason: string },
+  ) {
+    if (!body?.id || !body?.reason?.trim()) {
+      throw new BadRequestException('id and reason are required');
+    }
+    const gateId = body.gateId ?? 'face-gate';
+
+    if (body.kind === 'worker') {
+      const worker = await this.prisma.worker.findUnique({ where: { id: body.id }, select: { id: true, fullName: true } });
+      if (!worker) throw new NotFoundException('Worker not found');
+      const result = await this.toggleWorkerAttendance(worker.id, worker.fullName, gateId, body.branchId);
+      this.events.emit('gate.override', {
+        branchId: body.branchId, kind: 'worker', actorId: worker.id, actorName: worker.fullName,
+        byUserId: (user as any).userId, byEmail: user.email, reason: body.reason.slice(0, 500), ts: new Date().toISOString(),
+      });
+      return { decision: 'override-granted', kind: 'worker', id: worker.id, name: worker.fullName, ...result };
+    }
+
+    // visitor override — check them in regardless of approval state
+    const visit = await this.prisma.visit.findFirst({
+      where: { visitorId: body.id },
+      orderBy: { expectedEntry: 'desc' },
+      include: { visitor: { select: { fullName: true } } },
+    });
+    if (!visit) throw new NotFoundException('No visit on file for this visitor');
+    const ts = new Date().toISOString();
+    const upd = await this.prisma.visit.update({
+      where: { id: visit.id },
+      data: { status: VisitStatus.CHECKED_IN, actualEntry: new Date() },
+    });
+    this.events.emit('visit.checked_in', { branchId: upd.branchId, kind: 'visitor', actorId: body.id, actorName: visit.visitor.fullName, ts });
+    this.events.emit('headcount.invalidated', { branchId: upd.branchId, reason: 'override.entry', ts });
+    this.events.emit('gate.override', {
+      branchId: upd.branchId, kind: 'visitor', actorId: body.id, actorName: visit.visitor.fullName,
+      byUserId: (user as any).userId, byEmail: user.email, reason: body.reason.slice(0, 500), ts,
+    });
+    return { decision: 'override-granted', kind: 'visitor', id: body.id, name: visit.visitor.fullName, visitId: upd.id };
   }
 
   async checkInByQrToken(qrCodeToken: string) {

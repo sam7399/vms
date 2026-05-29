@@ -26,6 +26,7 @@ const KIND_BY_TYPE: Record<string, string> = {
   'tailgating': 'access.tailgating',
   'crowd-threshold': 'safety.crowd',
   'worker-non-compliant': 'compliance.worker',
+  'manual-override': 'access.override',
 };
 
 /**
@@ -171,6 +172,8 @@ function titleFor(input: RaiseAlertInput): string {
       return `Occupancy threshold exceeded`;
     case 'worker-non-compliant':
       return `Non-compliant worker on-site${who}`;
+    case 'manual-override':
+      return `Gateman override — entry forced${who}`;
     default:
       return `Security alert${who}`;
   }

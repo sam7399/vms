@@ -117,6 +117,18 @@ export interface FaceObservedPayload {
   ts: string;
 }
 
+/// Emitted when a gateman overrides a denied face-gate entry.
+export interface GateOverridePayload {
+  branchId?: string;
+  kind: 'worker' | 'visitor';
+  actorId: string;
+  actorName: string;
+  byUserId: string;
+  byEmail: string;
+  reason: string;
+  ts: string;
+}
+
 /// Emitted by the AlertAggregator once an alert is persisted.
 export interface AlertRaisedPayload {
   alertId: string;
@@ -141,6 +153,7 @@ export interface AppEventPayloads {
   'headcount.invalidated': HeadcountInvalidatedPayload;
   'gate.scan': GateScanPayload;
   'face.observed': FaceObservedPayload;
+  'gate.override': GateOverridePayload;
   'alert.raised': AlertRaisedPayload;
 }
 

@@ -5,6 +5,7 @@ import type {
   FaceObservedPayload,
   GateScanPayload,
   CheckInOutPayload,
+  GateOverridePayload,
 } from '../../platform/events/app-events';
 
 /**
@@ -88,6 +89,20 @@ export class Detectors {
         evidence: { gateId, count: win.length, ts: p.ts },
       });
     }
+  }
+
+  // ── Gateman override of a denied entry ──────────────────────────
+  @OnEvent('gate.override')
+  async onOverride(p: GateOverridePayload) {
+    await this.alerts.raise({
+      type: 'manual-override',
+      severity: 3,
+      branchId: p.branchId,
+      actorType: p.kind,
+      actorId: p.actorId,
+      actorName: p.actorName,
+      evidence: { overriddenBy: p.byEmail, byUserId: p.byUserId, reason: p.reason, ts: p.ts },
+    });
   }
 
   // ── After-hours check-in ────────────────────────────────────────
