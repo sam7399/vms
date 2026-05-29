@@ -194,6 +194,7 @@ model Visitor {
   notes          String?   @db.VarChar(1000)
   visits         Visit[]
   watchlistEntries WatchlistEntry[]
+  documents      VisitorDocument[]
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -743,4 +744,77 @@ model WatchlistEntry {
   @@unique([watchlistId, visitorId])
   @@index([visitorId])
   @@index([expiresAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Phase 5.3 — Document / NDA signing
+// ─────────────────────────────────────────────────────────────
+
+enum DocumentKind {
+  NDA
+  SAFETY_BRIEFING
+  DATA_HANDLING
+  PHOTO_CONSENT
+  HEALTH_SCREENING
+  OTHER
+}
+
+enum DocumentStatus {
+  PENDING
+  SIGNED
+  DECLINED
+  EXPIRED
+}
+
+model DocumentTemplate {
+  id            String        @id @default(uuid())
+  orgId         String?       @db.VarChar(100)   // null = global
+  branchId      String?       @db.VarChar(100)   // null = whole org
+  name          String        @db.VarChar(160)
+  kind          DocumentKind  @default(NDA)
+  bodyMarkdown  String        @db.Text
+  /// Extra fields the signer must fill, e.g. [{name,label,type,required}]
+  requiresFields Json?
+  version       Int           @default(1)
+  isActive      Boolean       @default(true)
+  /// Re-sign required after N days (null = sign once, forever)
+  validityDays  Int?
+  documents     VisitorDocument[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([orgId])
+  @@index([kind])
+}
+
+model VisitorDocument {
+  id              String         @id @default(uuid())
+  visitorId       String
+  visitId         String?        @db.VarChar(100)
+  templateId      String
+  templateVersion Int
+  status          DocumentStatus @default(PENDING)
+  /// opaque token for the public /sign/:token link
+  signToken       String         @unique @db.VarChar(128)
+  sentAt          DateTime       @default(now())
+  signedAt        DateTime?
+  declinedAt      DateTime?
+  expiresAt       DateTime?
+  /// signature as an SVG / PNG data URL
+  signatureData   String?        @db.Text
+  filledFields    Json?
+  ipAddress       String?        @db.VarChar(64)
+  userAgent       String?        @db.VarChar(500)
+  /// object-storage key for the generated immutable PDF
+  pdfStorageKey   String?        @db.VarChar(500)
+  /// sha256 of canonical content — tamper evidence
+  hash            String?        @db.VarChar(64)
+  createdAt       DateTime       @default(now())
+
+  visitor         Visitor          @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  template        DocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+
+  @@index([visitorId])
+  @@index([status])
+  @@index([signToken])
 }
