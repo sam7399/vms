@@ -32,6 +32,10 @@ const EN: Record<string, string> = {
   'nav.users': 'Users',
   'nav.branches': 'Branches',
   'nav.about': 'About',
+  'nav.security': 'Security',
+  'nav.incidents': 'Incidents',
+  'nav.watchlists': 'Watchlists',
+  'nav.faceGate': 'Face Gate',
 
   // Top-bar
   'topbar.lang': 'Language',
@@ -382,6 +386,10 @@ const HI: Record<string, string> = {
   'nav.users': 'उपयोगकर्ता',
   'nav.branches': 'शाखाएँ',
   'nav.about': 'जानकारी',
+  'nav.security': 'सुरक्षा',
+  'nav.incidents': 'घटनाएँ',
+  'nav.watchlists': 'निगरानी सूची',
+  'nav.faceGate': 'फेस गेट',
 
   'topbar.lang': 'भाषा',
   'topbar.subtitle': 'एंटरप्राइज़ आगंतुक एवं कार्यबल प्रबंधन',

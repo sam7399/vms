@@ -23,6 +23,15 @@ const CATEGORIES: Category[] = [
       { href: '/check-in', key: 'nav.checkIn' },
       { href: '/visitors-list', key: 'nav.visitorsDirectory' },
       { href: '/approvals', key: 'nav.approvals' },
+      { href: '/face-gate', key: 'nav.faceGate' },
+    ],
+  },
+  {
+    key: 'nav.security',
+    icon: ShieldCheck,
+    items: [
+      { href: '/incidents', key: 'nav.incidents' },
+      { href: '/watchlists', key: 'nav.watchlists' },
     ],
   },
   {
