@@ -193,6 +193,7 @@ model Visitor {
   isVip          Boolean   @default(false)
   notes          String?   @db.VarChar(1000)
   visits         Visit[]
+  watchlistEntries WatchlistEntry[]
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -683,4 +684,49 @@ model DetectorConfig {
 
   @@unique([orgId, slug])
   @@index([orgId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Phase 5 — Visitor Intelligence: Watchlists
+// Generalizes Visitor.isBlacklisted into named, graded lists.
+// isBlacklisted stays as a denormalized cache (kept in sync) so
+// existing code keeps working.
+// ─────────────────────────────────────────────────────────────
+
+model Watchlist {
+  id           String   @id @default(uuid())
+  orgId        String?  @db.VarChar(100)   // null = global (SUPER_ADMIN)
+  name         String   @db.VarChar(120)
+  description  String?  @db.VarChar(500)
+  /// 'block' | 'flag' | 'escort' | 'silent_notify'
+  kind         String   @default("flag") @db.VarChar(20)
+  severity     Int      @default(3)        // 1..5
+  isActive     Boolean  @default(true)
+  entries      WatchlistEntry[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([kind])
+}
+
+model WatchlistEntry {
+  id          String    @id @default(uuid())
+  watchlistId String
+  visitorId   String
+  reason      String    @db.VarChar(1000)
+  /// 'manual' | 'imported' | 'detector' | 'partner_feed'
+  source      String    @default("manual") @db.VarChar(20)
+  evidence    Json?
+  addedBy     String?   @db.VarChar(100)
+  addedByName String?   @db.VarChar(255)
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  watchlist   Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  visitor     Visitor   @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+
+  @@unique([watchlistId, visitorId])
+  @@index([visitorId])
+  @@index([expiresAt])
 }
