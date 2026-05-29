@@ -47,6 +47,9 @@ export default function CheckInPage() {
     vehicleNumber: '',
     expectedEntry: '',
     groupSize: '1',
+    passKind: 'SINGLE',
+    validUntil: '',
+    maxEntries: '',
   });
   const [photo, setPhoto] = useState<string>('');
 
@@ -132,6 +135,12 @@ export default function CheckInPage() {
         expectedEntry: form.expectedEntry || new Date().toISOString(),
         vehicleNumber: form.vehicleNumber || undefined,
         groupSize: Math.max(1, Math.min(20, parseInt(form.groupSize || '1', 10) || 1)),
+        passKind: form.passKind,
+        validUntil: form.passKind !== 'SINGLE' && form.validUntil ? form.validUntil : undefined,
+        maxEntries:
+          form.passKind === 'MULTI_ENTRY' && form.maxEntries
+            ? Math.max(1, parseInt(form.maxEntries, 10) || 1)
+            : undefined,
       });
 
       setQrToken(visit.qrCodeToken);
@@ -240,20 +249,61 @@ export default function CheckInPage() {
                 />
               </div>
             </div>
-            <div>
-              <label className="block text-xs text-zinc-400 mb-1">
-                {t('checkin.groupSize')}
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={form.groupSize}
-                onChange={(e) => set('groupSize', e.target.value)}
-                className="w-full md:w-32 px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="text-xs text-zinc-500 mt-1">{t('checkin.groupSizeHint')}</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">
+                  {t('checkin.groupSize')}
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={form.groupSize}
+                  onChange={(e) => set('groupSize', e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-zinc-500 mt-1">{t('checkin.groupSizeHint')}</p>
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">{t('checkin.passKind')}</label>
+                <select
+                  value={form.passKind}
+                  onChange={(e) => set('passKind', e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="SINGLE">{t('checkin.passSingle')}</option>
+                  <option value="MULTI_ENTRY">{t('checkin.passMultiEntry')}</option>
+                  <option value="MULTI_DAY">{t('checkin.passMultiDay')}</option>
+                  <option value="RECURRING">{t('checkin.passRecurring')}</option>
+                </select>
+              </div>
             </div>
+            {form.passKind !== 'SINGLE' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1">{t('checkin.validUntil')}</label>
+                  <input
+                    type="datetime-local"
+                    value={form.validUntil}
+                    onChange={(e) => set('validUntil', e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                {form.passKind === 'MULTI_ENTRY' && (
+                  <div>
+                    <label className="block text-xs text-zinc-400 mb-1">{t('checkin.maxEntries')}</label>
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder="∞"
+                      value={form.maxEntries}
+                      onChange={(e) => set('maxEntries', e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs text-zinc-400 mb-1">Document type</label>

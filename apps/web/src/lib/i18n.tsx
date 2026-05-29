@@ -321,6 +321,13 @@ const EN: Record<string, string> = {
   // Group visit
   'checkin.groupSize': 'Group size',
   'checkin.groupSizeHint': 'How many people will arrive together on this pass (1–20).',
+  'checkin.passKind': 'Pass type',
+  'checkin.passSingle': 'Single entry',
+  'checkin.passMultiEntry': 'Multi-entry (re-entry allowed)',
+  'checkin.passMultiDay': 'Multi-day',
+  'checkin.passRecurring': 'Recurring',
+  'checkin.validUntil': 'Valid until',
+  'checkin.maxEntries': 'Max entries (blank = ∞)',
 
   // Admin · Users
   'adminUsers.title': 'Users',
@@ -652,6 +659,13 @@ const HI: Record<string, string> = {
 
   'checkin.groupSize': 'समूह आकार',
   'checkin.groupSizeHint': 'इस पास पर एक साथ कितने लोग आएँगे (1–20)।',
+  'checkin.passKind': 'पास प्रकार',
+  'checkin.passSingle': 'एकल प्रवेश',
+  'checkin.passMultiEntry': 'बहु-प्रवेश (पुनः प्रवेश)',
+  'checkin.passMultiDay': 'बहु-दिवसीय',
+  'checkin.passRecurring': 'आवर्ती',
+  'checkin.validUntil': 'इस तक मान्य',
+  'checkin.maxEntries': 'अधिकतम प्रवेश (खाली = ∞)',
 
   'adminUsers.title': 'उपयोगकर्ता',
   'adminUsers.subtitle': 'उपयोगकर्ता जोड़ें या निष्क्रिय करें। भूमिकाएँ निर्धारित करती हैं कि वे क्या देख सकते हैं।',
