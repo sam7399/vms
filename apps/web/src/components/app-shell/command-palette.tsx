@@ -2,10 +2,20 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Search } from 'lucide-react';
+import { ArrowRight, Search, User, HardHat, Building2, CornerDownLeft } from 'lucide-react';
 import { cn, Kbd } from '@vms/ui';
 import { useI18n } from '@/lib/i18n';
+import { apiGet } from '@/lib/api';
 import { ALL_NAV_LEAVES } from './nav-config';
+
+interface SearchHit {
+  kind: 'visitor' | 'worker' | 'contractor';
+  id: string;
+  label: string;
+  sublabel?: string;
+  href: string;
+  badge?: string;
+}
 
 interface CommandPaletteProps {
   open: boolean;
@@ -23,37 +33,67 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(0);
+  const [hits, setHits] = useState<SearchHit[]>([]);
 
   useEffect(() => {
     if (!open) {
       setQuery('');
       setFocused(0);
+      setHits([]);
       return;
     }
     setTimeout(() => inputRef.current?.focus(), 30);
   }, [open]);
 
+  // Debounced entity search against the API (visitors / workers / contractors).
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setHits([]);
+      return;
+    }
+    const id = setTimeout(() => {
+      apiGet<SearchHit[]>(`/search?q=${encodeURIComponent(q)}`)
+        .then(setHits)
+        .catch(() => setHits([]));
+    }, 120);
+    return () => clearTimeout(id);
+  }, [query]);
+
   const items = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const all = ALL_NAV_LEAVES.map((leaf) => ({
-      kind: 'route' as const,
-      key: leaf.href,
+    const routes = ALL_NAV_LEAVES.map((leaf) => ({
+      type: 'route' as const,
+      key: `route:${leaf.href}`,
       label: t(leaf.i18nKey),
       hint: leaf.href,
       onSelect: () => router.push(leaf.href),
     }));
-    if (!q) return all;
-    return all
-      .map((item) => ({
-        ...item,
-        score:
-          item.label.toLowerCase().startsWith(q) ? 3 :
-          item.label.toLowerCase().includes(q) ? 2 :
-          item.hint.toLowerCase().includes(q) ? 1 : 0,
-      }))
-      .filter((x) => x.score > 0)
-      .sort((a, b) => b.score - a.score);
-  }, [query, t, router]);
+    const routeMatches = !q
+      ? routes
+      : routes
+          .map((item) => ({
+            ...item,
+            score:
+              item.label.toLowerCase().startsWith(q) ? 3 :
+              item.label.toLowerCase().includes(q) ? 2 :
+              item.hint.toLowerCase().includes(q) ? 1 : 0,
+          }))
+          .filter((x) => x.score > 0)
+          .sort((a, b) => b.score - a.score);
+
+    // Entity hits rank above routes when searching.
+    const entityItems = hits.map((h) => ({
+      type: h.kind,
+      key: `${h.kind}:${h.id}`,
+      label: h.label,
+      hint: h.sublabel ?? '',
+      badge: h.badge,
+      onSelect: () => router.push(h.href),
+    }));
+
+    return q ? [...entityItems, ...routeMatches] : routeMatches;
+  }, [query, t, router, hits]);
 
   useEffect(() => {
     if (!open) return;
@@ -106,29 +146,38 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
           {items.length === 0 ? (
             <li className="px-4 py-8 text-center text-sm text-text-tertiary">No results</li>
           ) : (
-            items.map((item, i) => (
-              <li
-                key={item.key}
-                onMouseEnter={() => setFocused(i)}
-                onClick={() => {
-                  item.onSelect();
-                  onClose();
-                }}
-                className={cn(
-                  'flex items-center gap-2.5 px-4 h-9 cursor-pointer text-sm',
-                  i === focused ? 'bg-surface-3 text-text-primary' : 'text-text-secondary',
-                )}
-              >
-                <ArrowRight
+            items.map((item, i) => {
+              const Icon =
+                item.type === 'visitor' ? User :
+                item.type === 'worker' ? HardHat :
+                item.type === 'contractor' ? Building2 : ArrowRight;
+              return (
+                <li
+                  key={item.key}
+                  onMouseEnter={() => setFocused(i)}
+                  onClick={() => {
+                    item.onSelect();
+                    onClose();
+                  }}
                   className={cn(
-                    'w-3.5 h-3.5 shrink-0',
-                    i === focused ? 'text-brand-400' : 'text-text-tertiary',
+                    'flex items-center gap-2.5 px-4 h-9 cursor-pointer text-sm',
+                    i === focused ? 'bg-surface-3 text-text-primary' : 'text-text-secondary',
                   )}
-                />
-                <span className="flex-1 truncate">{item.label}</span>
-                <span className="font-mono text-[10px] text-text-tertiary">{item.hint}</span>
-              </li>
-            ))
+                >
+                  <Icon
+                    className={cn(
+                      'w-3.5 h-3.5 shrink-0',
+                      i === focused ? 'text-brand-400' : 'text-text-tertiary',
+                    )}
+                  />
+                  <span className="flex-1 truncate">{item.label}</span>
+                  {'badge' in item && item.badge && (
+                    <span className="text-[10px] uppercase tracking-wider text-brand-300">{item.badge}</span>
+                  )}
+                  <span className="font-mono text-[10px] text-text-tertiary truncate max-w-[40%]">{item.hint}</span>
+                </li>
+              );
+            })
           )}
         </ul>
         <footer className="px-4 h-9 flex items-center justify-end gap-3 border-t border-border-subtle text-[10px] text-text-tertiary">

@@ -23,6 +23,7 @@ import { NoticesModule } from './modules/notices/notices.module';
 import { IntelligenceModule } from './modules/intelligence/intelligence.module';
 import { WatchlistsModule } from './modules/watchlists/watchlists.module';
 import { DocumentsModule } from './modules/documents/documents.module';
+import { SearchModule } from './modules/search/search.module';
 import { HeadcountModule } from './gateways/headcount.module';
 import { HealthController } from './health.controller';
 
@@ -58,6 +59,7 @@ import { HealthController } from './health.controller';
     IntelligenceModule,
     WatchlistsModule,
     DocumentsModule,
+    SearchModule,
   ],
   controllers: [HealthController],
   providers: [
