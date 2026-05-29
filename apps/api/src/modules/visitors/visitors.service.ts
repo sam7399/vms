@@ -49,6 +49,13 @@ export class VisitorsService {
       ? Math.min(20, Math.floor(data.groupSize))
       : 1;
 
+    const PASS_KINDS = ['SINGLE', 'MULTI_ENTRY', 'MULTI_DAY', 'RECURRING'];
+    const passKind = PASS_KINDS.includes(data.passKind) ? data.passKind : 'SINGLE';
+    const maxEntries =
+      Number.isFinite(data.maxEntries) && data.maxEntries >= 1
+        ? Math.min(500, Math.floor(data.maxEntries))
+        : null;
+
     return this.prisma.visit.create({
       data: {
         visitorId: data.visitorId,
@@ -59,6 +66,12 @@ export class VisitorsService {
         vehicleNumber: data.vehicleNumber,
         qrCodeToken: qrToken,
         groupSize,
+        passKind: passKind as any,
+        validFrom: data.validFrom ? new Date(data.validFrom) : null,
+        validUntil: data.validUntil ? new Date(data.validUntil) : null,
+        maxEntries,
+        escortRequired: !!data.escortRequired,
+        escortUserId: data.escortUserId ?? null,
         status: data.status === 'APPROVED' ? VisitStatus.APPROVED : VisitStatus.PENDING,
       },
     });

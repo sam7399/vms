@@ -295,6 +295,69 @@ export class GateService {
       );
     }
 
+    // Multi-entry / multi-day / recurring passes: validity window + cap,
+    // and a scan toggles in↔out (re-entry allowed). SINGLE passes fall
+    // through to the original one-shot logic below.
+    if (visit.passKind !== 'SINGLE') {
+      const now = new Date();
+      if (visit.status === VisitStatus.PENDING) {
+        scan('rejected', 'pending approval');
+        throw new BadRequestException('Pass is awaiting host approval');
+      }
+      if (visit.status === VisitStatus.REJECTED || visit.status === VisitStatus.BLACKLISTED) {
+        scan('rejected', `reject:${visit.status}`);
+        throw new BadRequestException(`Visit is ${visit.status}`);
+      }
+      if (visit.validFrom && now < visit.validFrom) {
+        scan('rejected', 'pass not yet valid');
+        throw new BadRequestException('Pass is not valid yet');
+      }
+      if (visit.validUntil && now > visit.validUntil) {
+        scan('rejected', 'pass expired');
+        throw new BadRequestException('Pass has expired');
+      }
+
+      const ts2 = now.toISOString();
+      if (visit.status === VisitStatus.CHECKED_IN) {
+        // toggle out
+        await this.prisma.visit.update({
+          where: { id: visit.id },
+          data: { status: VisitStatus.CHECKED_OUT, actualExit: now },
+        });
+        scan('approved', 'exit');
+        this.events.emit('visit.checked_out', {
+          branchId: visit.branchId, kind: 'visitor',
+          actorId: visit.visitorId, actorName: visit.visitor.fullName, ts: ts2,
+        });
+        this.events.emit('headcount.invalidated', { branchId: visit.branchId, reason: 'multipass.exit', ts: ts2 });
+        return { success: true, action: 'checked-out', visitorName: visit.visitor.fullName, visitId: visit.id };
+      }
+
+      // entering (APPROVED first time, or CHECKED_OUT re-entry)
+      if (visit.maxEntries != null && visit.entryCount >= visit.maxEntries) {
+        scan('rejected', 'entry cap reached');
+        throw new BadRequestException(`Pass entry limit (${visit.maxEntries}) reached`);
+      }
+      const upd = await this.prisma.visit.update({
+        where: { id: visit.id },
+        data: { status: VisitStatus.CHECKED_IN, actualEntry: now, entryCount: { increment: 1 } },
+      });
+      scan('approved');
+      this.events.emit('visit.checked_in', {
+        branchId: visit.branchId, kind: 'visitor',
+        actorId: visit.visitorId, actorName: visit.visitor.fullName, ts: ts2,
+      });
+      this.events.emit('headcount.invalidated', { branchId: visit.branchId, reason: 'multipass.entry', ts: ts2 });
+      return {
+        success: true,
+        action: 'checked-in',
+        visitorName: visit.visitor.fullName,
+        visitId: visit.id,
+        entryCount: upd.entryCount,
+        maxEntries: visit.maxEntries ?? null,
+      };
+    }
+
     if (visit.status === VisitStatus.CHECKED_IN) {
       return {
         success: true,

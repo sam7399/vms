@@ -202,6 +202,13 @@ model Visitor {
   @@index([isVip])
 }
 
+enum PassKind {
+  SINGLE
+  MULTI_ENTRY
+  MULTI_DAY
+  RECURRING
+}
+
 model Visit {
   id             String      @id @default(uuid())
   visitorId      String
@@ -216,6 +223,13 @@ model Visit {
   qrCodeToken    String      @unique @db.VarChar(500)
   parkingSlotId  String?
   groupSize      Int         @default(1)
+  passKind       PassKind    @default(SINGLE)
+  validFrom      DateTime?
+  validUntil     DateTime?
+  maxEntries     Int?
+  entryCount     Int         @default(0)
+  escortRequired Boolean     @default(false)
+  escortUserId   String?     @db.VarChar(100)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
