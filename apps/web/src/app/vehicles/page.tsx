@@ -134,12 +134,12 @@ export default function VehiclesPage() {
                         <p className="text-white font-mono font-medium">{r.vehicleNumber}</p>
                       </td>
                       <td className="p-4">
-                        <p className="text-white">{r.visitor.fullName}</p>
+                        <p className="text-white">{r.visitor?.fullName ?? '—'}</p>
                         <p className="text-xs text-zinc-500">
-                          {r.visitor.company || r.visitor.phone}
+                          {r.visitor?.company || r.visitor?.phone || ''}
                         </p>
                       </td>
-                      <td className="p-4 text-zinc-300">{r.branch.name}</td>
+                      <td className="p-4 text-zinc-300">{r.branch?.name ?? '—'}</td>
                       <td className="p-4">
                         <span className={`px-2 py-1 rounded text-xs ${statusColor(r.status)}`}>
                           {r.status.replace(/_/g, ' ')}

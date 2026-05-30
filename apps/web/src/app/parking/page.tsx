@@ -68,7 +68,7 @@ export default function ParkingPage() {
     if (!slots) return [];
     const byBranch = new Map<string, { branch: string; slots: Slot[] }>();
     for (const s of slots) {
-      if (!byBranch.has(s.branchId)) byBranch.set(s.branchId, { branch: s.branch.name, slots: [] });
+      if (!byBranch.has(s.branchId)) byBranch.set(s.branchId, { branch: s.branch?.name ?? 'Unknown branch', slots: [] });
       byBranch.get(s.branchId)!.slots.push(s);
     }
     return Array.from(byBranch.values());
@@ -209,7 +209,7 @@ export default function ParkingPage() {
                       </div>
                       {occupied ? (
                         <>
-                          <p className="text-xs text-white truncate">{v.visitor.fullName}</p>
+                          <p className="text-xs text-white truncate">{v.visitor?.fullName ?? '—'}</p>
                           {v.vehicleNumber && (
                             <p className="text-xs text-red-300 font-mono truncate">
                               {v.vehicleNumber}

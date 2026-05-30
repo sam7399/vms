@@ -153,7 +153,9 @@ export default function MyVisitsPage() {
                     </div>
                     <p className="text-white">{v.purpose}</p>
                     <p className="text-xs text-zinc-400 mt-1">
-                      Host: {v.host.fullName} · {v.branch.name} ({v.branch.location})
+                      Host: {v.host?.fullName ?? '—'}
+                      {v.branch?.name ? ` · ${v.branch.name}` : ''}
+                      {v.branch?.location ? ` (${v.branch.location})` : ''}
                     </p>
                     {v.vehicleNumber && (
                       <p className="text-xs text-zinc-500 mt-1">Vehicle: {v.vehicleNumber}</p>
