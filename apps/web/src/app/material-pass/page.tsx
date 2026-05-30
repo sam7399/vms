@@ -11,8 +11,9 @@ import { useI18n } from '@/lib/i18n';
 
 interface Visit {
   id: string;
-  visitor: { fullName: string; company: string | null };
-  branch: { name: string };
+  visitor?: { fullName: string; company: string | null } | null;
+  /** /visitors/visits does NOT include the branch relation; guard everywhere. */
+  branch?: { name: string } | null;
   status: string;
 }
 interface Pass {
@@ -26,9 +27,9 @@ interface Pass {
   createdAt: string;
   visit?: {
     id: string;
-    visitor: { fullName: string; company: string | null };
-    branch: { name: string };
-  };
+    visitor?: { fullName: string; company: string | null } | null;
+    branch?: { name: string } | null;
+  } | null;
 }
 
 export default function MaterialPassPage() {
@@ -91,9 +92,9 @@ export default function MaterialPassPage() {
     if (!q) return passes;
     return passes.filter(
       (p) =>
-        p.description.toLowerCase().includes(q) ||
+        (p.description ?? '').toLowerCase().includes(q) ||
         (p.serialNumber && p.serialNumber.toLowerCase().includes(q)) ||
-        (p.visit?.visitor.fullName.toLowerCase().includes(q) ?? false),
+        (p.visit?.visitor?.fullName?.toLowerCase().includes(q) ?? false),
     );
   }, [passes, search]);
 
@@ -136,8 +137,8 @@ export default function MaterialPassPage() {
                       description: p.description,
                       quantity: p.quantity,
                       serialNumber: p.serialNumber,
-                      visitor: p.visit?.visitor.fullName,
-                      branch: p.visit?.branch.name,
+                      visitor: p.visit?.visitor?.fullName ?? '',
+                      branch: p.visit?.branch?.name ?? '',
                       recordedBy: p.recordedBy,
                       createdAt: p.createdAt,
                     })) as any,
@@ -179,8 +180,9 @@ export default function MaterialPassPage() {
                 <option value="">— Visit —</option>
                 {visits.map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.visitor.fullName}
-                    {v.visitor.company && ` (${v.visitor.company})`} · {v.branch.name} · {v.status}
+                    {v.visitor?.fullName ?? 'Unknown visitor'}
+                    {v.visitor?.company ? ` (${v.visitor.company})` : ''}
+                    {v.branch?.name ? ` · ${v.branch.name}` : ''} · {v.status}
                   </option>
                 ))}
               </select>
@@ -315,8 +317,8 @@ export default function MaterialPassPage() {
                       {p.serialNumber || '—'}
                     </td>
                     <td className="p-4 text-zinc-300">
-                      {p.visit?.visitor.fullName ?? '—'}
-                      {p.visit?.visitor.company && (
+                      {p.visit?.visitor?.fullName ?? '—'}
+                      {p.visit?.visitor?.company && (
                         <span className="text-xs text-zinc-500"> · {p.visit.visitor.company}</span>
                       )}
                     </td>

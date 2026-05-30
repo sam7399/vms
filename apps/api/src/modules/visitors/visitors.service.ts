@@ -93,6 +93,7 @@ export class VisitorsService {
       include: {
         visitor: true,
         host: { select: { id: true, fullName: true, email: true } },
+        branch: { select: { id: true, name: true, location: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -194,6 +195,7 @@ export class VisitorsService {
       include: {
         visitor: true,
         host: { select: { id: true, fullName: true, email: true } },
+        branch: { select: { id: true, name: true, location: true } },
       },
     });
   }
