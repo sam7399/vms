@@ -12,6 +12,7 @@ import { VisitsChart } from "@/components/dashboard/VisitsChart";
 import { VisitsHeatmap } from "@/components/dashboard/VisitsHeatmap";
 import { AnomaliesBanner } from "@/components/dashboard/AnomaliesBanner";
 import { NoticesWidget } from "@/components/dashboard/NoticesWidget";
+import { OccupancyByCompany } from "@/components/dashboard/OccupancyByCompany";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { useI18n } from "@/lib/i18n";
 
@@ -56,8 +57,13 @@ export default function DashboardPage() {
           </div>
           <BranchFilter value={branchId} onChange={setBranchId} />
         </div>
-        <div className="mt-4">
-          <LiveHeadcountCard branchId={branchId} />
+        <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <LiveHeadcountCard branchId={branchId} />
+          </div>
+          <div>
+            <OccupancyByCompany branchId={branchId} />
+          </div>
         </div>
 
         <NoticesWidget />

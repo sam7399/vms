@@ -420,4 +420,48 @@ export class VisitorsService {
       employees,
     };
   }
+
+  /**
+   * Live occupancy grouped by company — combines visitors (visitor.company
+   * free text) with contract workers (contractor.companyName). Used by the
+   * dashboard "By Company" widget so the operator can see who is inside
+   * per contractor / company at a glance.
+   */
+  async getOccupancyByCompany(user: JwtUser, branchId?: string) {
+    const orgFilter = visitScope(user);
+    const visitWhere: any = { status: VisitStatus.CHECKED_IN, actualExit: null, ...orgFilter };
+    const attendanceWhere: any = { checkOut: null };
+    if (!isSuperAdmin(user)) {
+      attendanceWhere.branch = { organizationId: (user as any).orgId };
+    }
+    if (branchId) {
+      visitWhere.branchId = branchId;
+      attendanceWhere.branchId = branchId;
+    }
+
+    const [visits, attendance] = await Promise.all([
+      this.prisma.visit.findMany({
+        where: visitWhere,
+        select: { visitor: { select: { company: true } } },
+      }),
+      this.prisma.attendance.findMany({
+        where: attendanceWhere,
+        select: { worker: { select: { contractor: { select: { companyName: true } } } } },
+      }),
+    ]);
+
+    const buckets = new Map<string, { company: string; visitors: number; workers: number }>();
+    const bump = (key: string, kind: 'visitors' | 'workers') => {
+      const k = key || 'Unspecified';
+      const b = buckets.get(k) ?? { company: k, visitors: 0, workers: 0 };
+      b[kind] += 1;
+      buckets.set(k, b);
+    };
+    for (const v of visits) bump(v.visitor?.company ?? 'In-house / Employee', 'visitors');
+    for (const a of attendance) bump(a.worker?.contractor?.companyName ?? 'In-house', 'workers');
+
+    return Array.from(buckets.values())
+      .map((b) => ({ ...b, total: b.visitors + b.workers }))
+      .sort((a, b) => b.total - a.total);
+  }
 }

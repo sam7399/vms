@@ -44,6 +44,11 @@ export class VisitorsController {
     return this.visitorsService.getLiveHeadcount(user);
   }
 
+  @Get('headcount-by-company')
+  getHeadcountByCompany(@CurrentUser() user: JwtUser, @Query('branchId') branchId?: string) {
+    return this.visitorsService.getOccupancyByCompany(user, branchId || undefined);
+  }
+
   @Get('active')
   getActive(@CurrentUser() user: JwtUser, @Query('branchId') branchId?: string) {
     return this.visitorsService.getActiveOnSite(user, branchId || undefined);
