@@ -28,15 +28,36 @@ export default function FaceGatePage() {
   const [overrideReason, setOverrideReason] = useState('');
   const [overriding, setOverriding] = useState(false);
 
-  // Boot: load face models + open camera in parallel.
+  // Open camera FIRST (independent of face-api so the viewfinder shows even if
+  // the CDN is slow), then load the models in the background.
   useEffect(() => {
     let cancelled = false;
+
+    async function openCamera() {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Camera not supported in this browser (needs HTTPS + getUserMedia).');
+      }
+      // Try the preferred front-camera + HD constraint first; fall back to "any
+      // camera" so desktops without a labelled front cam still work.
+      const attempts: MediaStreamConstraints[] = [
+        { video: { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+        { video: { facingMode: { ideal: 'user' } } },
+        { video: true },
+      ];
+      let lastErr: unknown;
+      for (const c of attempts) {
+        try {
+          return await navigator.mediaDevices.getUserMedia(c);
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      throw lastErr ?? new Error('No camera available');
+    }
+
     (async () => {
       try {
-        const [, stream] = await Promise.all([
-          loadFaceApi(),
-          navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } }),
-        ]);
+        const stream = await openCamera();
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
@@ -44,14 +65,33 @@ export default function FaceGatePage() {
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          // play() needs a user gesture on some browsers but works after
+          // getUserMedia resolved on most. Swallow autoplay rejections.
           await videoRef.current.play().catch(() => {});
         }
         setPhase('ready');
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Camera or face engine unavailable');
+      } catch (e: any) {
+        const name = e?.name as string | undefined;
+        const msg =
+          name === 'NotAllowedError'
+            ? 'Camera permission denied — allow camera access in your browser settings.'
+            : name === 'NotFoundError'
+            ? 'No camera found on this device.'
+            : name === 'NotReadableError'
+            ? 'Camera is in use by another app — close it and refresh.'
+            : e?.message || 'Camera unavailable';
+        setError(msg);
         setPhase('ready');
       }
+
+      // Load face models in the background — failure here doesn't block the
+      // viewfinder; the scan button will surface the error on use.
+      loadFaceApi().catch((e) => {
+        if (cancelled) return;
+        setError((prev) => prev ?? (e?.message || 'Face engine failed to load'));
+      });
     })();
+
     return () => {
       cancelled = true;
       streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -129,7 +169,7 @@ export default function FaceGatePage() {
 
         {/* Camera viewfinder */}
         <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-surface-1 border border-border-strong">
-          <video ref={videoRef} muted playsInline className="w-full h-full object-cover -scale-x-100" />
+          <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover -scale-x-100" />
           {/* scan ring */}
           <div
             className={`absolute inset-8 rounded-full border-2 transition-colors ${

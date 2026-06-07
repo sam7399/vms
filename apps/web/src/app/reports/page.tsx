@@ -256,13 +256,20 @@ export default function ReportsPage() {
   const loadReport = useCallback(() => {
     setLoading(true);
     setError(null);
+    setData(null);
     setExpanded(null);
     setDetail(null);
     apiGet<any>(`${activeReport.endpoint}${qs({ ...baseParams, groupBy })}`)
       .then(setData)
       .catch((e) => {
         setData(null);
-        setError(e instanceof Error ? e.message : 'Failed to load report');
+        const raw = e instanceof Error ? e.message : 'Failed to load report';
+        const isMissing = /404|not.*found|cannot.*get/i.test(raw);
+        setError(
+          isMissing
+            ? `This report is still deploying on the API — wait ~30s and click Refresh. (${raw})`
+            : raw,
+        );
       })
       .finally(() => setLoading(false));
   }, [activeReport, baseParams, groupBy]);

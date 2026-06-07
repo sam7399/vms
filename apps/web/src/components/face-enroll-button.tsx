@@ -45,12 +45,17 @@ export function FaceEnrollButton({ kind, id, label, onEnrolled, autoStart, onClo
   async function start() {
     setOpen(true);
     setState({ kind: 'loading' });
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setState({ kind: 'error', message: 'Camera not supported (needs HTTPS).' });
+      return;
+    }
+    // Open the camera FIRST so the viewfinder appears even if face-api CDN is
+    // slow. Face models load in the background; capture() waits for them.
     try {
-      await loadFaceApi();
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } },
+          video: { facingMode: { ideal: 'user' }, width: { ideal: 480 }, height: { ideal: 480 } },
           audio: false,
         });
       } catch {
@@ -64,14 +69,18 @@ export function FaceEnrollButton({ kind, id, label, onEnrolled, autoStart, onClo
           try { await videoRef.current.play(); } catch {}
         }
       });
+      // Warm the face models in the background.
+      loadFaceApi().catch(() => {});
     } catch (e: any) {
       setState({
         kind: 'error',
         message:
           e?.name === 'NotAllowedError'
-            ? 'Camera permission denied.'
+            ? 'Camera permission denied — allow camera in browser settings.'
             : e?.name === 'NotFoundError'
             ? 'No camera found on this device.'
+            : e?.name === 'NotReadableError'
+            ? 'Camera in use by another app — close it and retry.'
             : e?.message || 'Could not start camera',
       });
     }
