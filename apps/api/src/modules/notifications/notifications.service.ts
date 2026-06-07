@@ -6,6 +6,8 @@ interface SendArgs {
   to: string;
   subject: string;
   html: string;
+  /** Optional file attachments. `content` is base64-encoded. */
+  attachments?: { filename: string; content: string }[];
 }
 
 interface PushArgs {
@@ -82,7 +84,7 @@ export class NotificationsService implements OnModuleInit {
     }
   }
 
-  async send({ to, subject, html }: SendArgs): Promise<{ sent: boolean; reason?: string }> {
+  async send({ to, subject, html, attachments }: SendArgs): Promise<{ sent: boolean; reason?: string }> {
     if (!this.apiKey) {
       this.log.log(`[noop] would email ${to}: ${subject}`);
       return { sent: false, reason: 'RESEND_API_KEY not configured' };
@@ -94,7 +96,13 @@ export class NotificationsService implements OnModuleInit {
           Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ from: this.from, to, subject, html }),
+        body: JSON.stringify({
+          from: this.from,
+          to,
+          subject,
+          html,
+          ...(attachments?.length ? { attachments } : {}),
+        }),
       });
       if (!res.ok) {
         const body = await res.text().catch(() => '');

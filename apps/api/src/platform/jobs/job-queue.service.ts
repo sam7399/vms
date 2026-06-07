@@ -119,6 +119,29 @@ export class JobQueueService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  /**
+   * Register a repeatable (cron-like) job that fires every `everyMs`.
+   * BullMQ keys repeatables by name + repeat options, so calling this from
+   * multiple instances is safe — only one repeat entry exists, and each
+   * emitted occurrence is consumed by exactly one worker.
+   *
+   * No-op in inline mode (no Redis) — callers should run their own timer.
+   */
+  async addRepeatable(name: string, everyMs: number, data: unknown = {}): Promise<void> {
+    const reg = this.registry.get(name);
+    if (!reg) {
+      this.log.warn(`addRepeatable("${name}"): no handler registered, skipping`);
+      return;
+    }
+    if (!this.redis) return; // inline mode: caller drives its own interval
+    const queue = this.queues.get(name)!;
+    await queue.add(name, data, {
+      repeat: { every: everyMs },
+      removeOnComplete: true,
+      removeOnFail: { count: 500 },
+    });
+  }
+
   isQueueMode(): boolean {
     return !!this.redis;
   }

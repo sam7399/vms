@@ -24,6 +24,7 @@ import { IntelligenceModule } from './modules/intelligence/intelligence.module';
 import { WatchlistsModule } from './modules/watchlists/watchlists.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { SearchModule } from './modules/search/search.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { HeadcountModule } from './gateways/headcount.module';
 import { HealthController } from './health.controller';
 
@@ -60,6 +61,7 @@ import { HealthController } from './health.controller';
     WatchlistsModule,
     DocumentsModule,
     SearchModule,
+    ReportsModule,
   ],
   controllers: [HealthController],
   providers: [

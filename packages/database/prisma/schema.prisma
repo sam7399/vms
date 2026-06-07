@@ -787,6 +787,41 @@ model DocumentTemplate {
   @@index([kind])
 }
 
+// ─────────────────────────────────────────────────────────────
+// Reporting — saved schedules for automated email delivery.
+// A lightweight in-process scheduler (ReportScheduler) polls nextRunAt
+// and emails the rendered report (CSV attachment + HTML summary).
+// ─────────────────────────────────────────────────────────────
+model ReportSchedule {
+  id           String    @id @default(uuid())
+  orgId        String?   @db.VarChar(100)   // null = SUPER_ADMIN global
+  branchId     String?   @db.VarChar(100)
+  contractorId String?   @db.VarChar(100)
+  createdBy    String?   @db.VarChar(100)
+  name         String    @db.VarChar(160)
+  /// visits | workforce | contractors | branches | users | materials
+  report       String    @db.VarChar(40)
+  groupBy      String?   @db.VarChar(40)
+  /// thisMonth | lastMonth | last7d | last30d | last90d | ytd
+  rangePreset  String    @default("last30d") @db.VarChar(40)
+  /// daily | weekly | monthly
+  frequency    String    @default("monthly") @db.VarChar(20)
+  hourUtc      Int       @default(6)
+  dayOfWeek    Int?      // 0..6 (Sun..Sat) for weekly
+  dayOfMonth   Int?      // 1..28 for monthly
+  /// comma-separated recipient emails
+  recipients   String    @db.VarChar(1000)
+  isActive     Boolean   @default(true)
+  lastRunAt    DateTime?
+  lastStatus   String?   @db.VarChar(300)
+  nextRunAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([isActive, nextRunAt])
+  @@index([orgId])
+}
+
 model VisitorDocument {
   id              String         @id @default(uuid())
   visitorId       String

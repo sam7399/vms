@@ -5,7 +5,7 @@
     "buildCommand": "npm install --include=dev && npx prisma generate --schema=packages/database/prisma/schema.prisma && npm --workspace=@vms/shared run build && npm --workspace=@vms/api run build"
   },
   "deploy": {
-    "startCommand": "npm --workspace=@vms/api start",
+    "startCommand": "npx prisma db push --schema=packages/database/prisma/schema.prisma --skip-generate --accept-data-loss && npm --workspace=@vms/api start",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",
