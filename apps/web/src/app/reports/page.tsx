@@ -16,6 +16,10 @@ import {
   Sparkles,
   TableProperties,
   BarChart3,
+  Grid3X3,
+  TrendingUp,
+  TrendingDown,
+  Minus,
 } from 'lucide-react';
 import { apiGet, apiPost } from '@/lib/api';
 import { downloadCSV } from '@/lib/csv';
@@ -23,6 +27,7 @@ import { downloadPDF } from '@/lib/pdf';
 import { downloadXLSX } from '@/lib/xlsx';
 import { downloadJSON, downloadXML, printReport } from '@/lib/export-formats';
 import { ReportChart, type Series } from '@/components/reports/ReportChart';
+import { ReportHeatmap } from '@/components/reports/ReportHeatmap';
 import { SchedulesPanel } from '@/components/reports/SchedulesPanel';
 import { CatalogRail, type CatalogSection } from '@/components/reports/CatalogRail';
 import { DownloadCenter, type ExportFormat, type ExportScope } from '@/components/reports/DownloadCenter';
@@ -229,6 +234,7 @@ const RENDER: Record<string, ReportRender> = {
     groupBy: [
       ...TIME_GROUPS,
       { value: 'hour', label: 'By hour of day' },
+      { value: 'heatmap', label: 'Heatmap (day × hour)' },
       { value: 'branch', label: 'By branch / location' },
     ],
   },
@@ -273,7 +279,8 @@ export default function ReportsPage() {
   // Per-report group-by + column selection
   const [groupByByReport, setGroupByByReport] = useState<Record<string, string>>({});
   const [columnsByReport, setColumnsByReport] = useState<Record<string, string[] | null>>({});
-  const [view, setView] = useState<'chart' | 'table'>('chart');
+  const [view, setView] = useState<'chart' | 'table' | 'heatmap'>('chart');
+  const [compare, setCompare] = useState(false);
 
   // Data
   const [data, setData] = useState<any | null>(null);
@@ -300,6 +307,7 @@ export default function ReportsPage() {
   const groupBy = groupByByReport[activeKey] ?? render?.groupBy?.[0]?.value;
   const detailGroupBy = render?.groupBy ? groupBy : render?.fixedDetailGroupBy;
   const isTimeGroup = ['day', 'week', 'month', 'year', 'hour'].includes(groupBy ?? '');
+  const isHeatmap = groupBy === 'heatmap';
   const selectedColumns = columnsByReport[activeKey] ?? null;
 
   // Lookup: which catalog entry is selected?
@@ -335,10 +343,10 @@ export default function ReportsPage() {
   );
 
   const loadOverview = useCallback(() => {
-    apiGet<any>(`/reports/overview${qs({ from, to, branchId })}`)
+    apiGet<any>(`/reports/overview${qs({ from, to, branchId, compare: compare ? 'true' : undefined })}`)
       .then(setOverview)
       .catch(() => setOverview(null));
-  }, [from, to, branchId]);
+  }, [from, to, branchId, compare]);
 
   const loadReport = useCallback(() => {
     if (!render) return;
@@ -346,7 +354,7 @@ export default function ReportsPage() {
     setError(null);
     setData(null);
     setDrillOpen(false);
-    apiGet<any>(`${render.endpoint}${qs({ ...baseParams, groupBy })}`)
+    apiGet<any>(`${render.endpoint}${qs({ ...baseParams, groupBy, compare: compare ? 'true' : undefined })}`)
       .then(setData)
       .catch((e) => {
         setData(null);
@@ -359,7 +367,7 @@ export default function ReportsPage() {
         );
       })
       .finally(() => setLoading(false));
-  }, [render, baseParams, groupBy]);
+  }, [render, baseParams, groupBy, compare]);
 
   useEffect(() => {
     if (isAuthenticated) loadOverview();
@@ -492,11 +500,20 @@ export default function ReportsPage() {
       } else if (fmt === 'pdf') {
         downloadPDF(`${safe}.pdf`, {
           title: activeMeta.label,
-          subtitle: `${groupBy ? humanize(groupBy) : 'Report'} · ${from} → ${to}`,
+          subtitle: `${groupBy ? humanize(groupBy) : 'Report'} · ${from} → ${to}${compare ? ' · vs prior period' : ''}`,
           filters: appliedFiltersForPdf(),
           kpis: kpisForPdf(),
           generatedBy: user?.fullName || user?.email,
           brand: 'AEGIS',
+          comparison: compare && data?.deltas
+            ? {
+                priorRange: data?.prior?.range
+                  ? { from: data.prior.range.from.slice(0, 10), to: data.prior.range.to.slice(0, 10) }
+                  : undefined,
+                priorTotals: data?.prior?.totals,
+                deltas: data.deltas,
+              }
+            : undefined,
         }, scope === 'summary' ? summaryRows : exportRows);
       } else if (fmt === 'json') {
         downloadJSON(safe, {
@@ -644,18 +661,18 @@ export default function ReportsPage() {
         {/* ── KPI strip (always visible) ───────────────────────── */}
         {kpis && (
           <div className="mb-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <Kpi label="Total visits" value={kpis.totalVisits} />
-            <Kpi label="Unique" value={kpis.uniqueVisitors} />
-            <Kpi label="Checked in" value={kpis.checkedInVisits} />
-            <Kpi label="Avg dwell" value={kpis.avgVisitDurationMin != null ? `${kpis.avgVisitDurationMin}m` : '—'} />
-            <Kpi label="Worker hours" value={kpis.totalWorkerHours} />
-            <Kpi label="Workers on site" value={kpis.uniqueWorkersOnSite} />
-            <Kpi label="Active workers" value={kpis.activeWorkers} />
-            <Kpi label="Contractors" value={kpis.contractors} />
-            <Kpi label="Avg compliance" value={kpis.avgComplianceScore != null ? `${kpis.avgComplianceScore}%` : '—'} />
-            <Kpi label="Completed" value={kpis.completedVisits} />
-            <Kpi label="Rejected" value={kpis.rejectedVisits} />
-            <Kpi label="Headcount" value={kpis.totalHeadcount} />
+            <Kpi label="Total visits" value={kpis.totalVisits} delta={overview?.deltas?.totalVisits} />
+            <Kpi label="Unique" value={kpis.uniqueVisitors} delta={overview?.deltas?.uniqueVisitors} />
+            <Kpi label="Checked in" value={kpis.checkedInVisits} delta={overview?.deltas?.checkedInVisits} />
+            <Kpi label="Avg dwell" value={kpis.avgVisitDurationMin != null ? `${kpis.avgVisitDurationMin}m` : '—'} delta={overview?.deltas?.avgVisitDurationMin} />
+            <Kpi label="Worker hours" value={kpis.totalWorkerHours} delta={overview?.deltas?.totalWorkerHours} />
+            <Kpi label="Workers on site" value={kpis.uniqueWorkersOnSite} delta={overview?.deltas?.uniqueWorkersOnSite} />
+            <Kpi label="Active workers" value={kpis.activeWorkers} delta={overview?.deltas?.activeWorkers} />
+            <Kpi label="Contractors" value={kpis.contractors} delta={overview?.deltas?.contractors} />
+            <Kpi label="Avg compliance" value={kpis.avgComplianceScore != null ? `${kpis.avgComplianceScore}%` : '—'} delta={overview?.deltas?.avgComplianceScore} />
+            <Kpi label="Completed" value={kpis.completedVisits} delta={overview?.deltas?.completedVisits} />
+            <Kpi label="Rejected" value={kpis.rejectedVisits} delta={overview?.deltas?.rejectedVisits} invertColor />
+            <Kpi label="Headcount" value={kpis.totalHeadcount} delta={overview?.deltas?.totalHeadcount} />
           </div>
         )}
 
@@ -761,22 +778,49 @@ export default function ReportsPage() {
                       setColumnsByReport((m) => ({ ...m, [activeKey]: next }))
                     }
                   />
+                  <button
+                    type="button"
+                    onClick={() => setCompare((v) => !v)}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                      compare
+                        ? 'bg-brand-500/15 border-brand-500/40 text-brand-300'
+                        : 'bg-surface-2 hover:bg-surface-3 border-border-subtle text-text-secondary hover:text-text-primary'
+                    }`}
+                    title="Compare against the equivalent prior period"
+                  >
+                    <TrendingUp className="w-4 h-4" />
+                    Compare vs prior
+                  </button>
                   <div className="flex rounded-lg bg-surface-2 border border-border-subtle p-1">
-                    {(['chart', 'table'] as const).map((v) => (
+                    {(['chart', 'table'] as const).map((v) => {
+                      const disabled = isHeatmap;
+                      return (
+                        <button
+                          key={v}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => setView(v)}
+                          className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors ${
+                            view === v && !isHeatmap
+                              ? 'bg-brand-gradient text-white'
+                              : 'text-text-tertiary hover:text-text-primary disabled:opacity-40 disabled:cursor-not-allowed'
+                          }`}
+                        >
+                          {v === 'chart' ? <BarChart3 className="w-3.5 h-3.5" /> : <TableProperties className="w-3.5 h-3.5" />}
+                          <span className="capitalize">{v}</span>
+                        </button>
+                      );
+                    })}
+                    {isHeatmap && (
                       <button
-                        key={v}
                         type="button"
-                        onClick={() => setView(v)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors ${
-                          view === v
-                            ? 'bg-brand-gradient text-white'
-                            : 'text-text-tertiary hover:text-text-primary'
-                        }`}
+                        disabled
+                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded bg-brand-gradient text-white"
                       >
-                        {v === 'chart' ? <BarChart3 className="w-3.5 h-3.5" /> : <TableProperties className="w-3.5 h-3.5" />}
-                        <span className="capitalize">{v}</span>
+                        <Grid3X3 className="w-3.5 h-3.5" />
+                        <span>Heatmap</span>
                       </button>
-                    ))}
+                    )}
                   </div>
                   <button
                     type="button"
@@ -796,15 +840,19 @@ export default function ReportsPage() {
 
               {data?.totals && (
                 <div className="flex flex-wrap gap-2 px-5 py-3 border-b border-border-subtle bg-surface-2/50">
-                  {Object.entries(data.totals).map(([k, v]) => (
-                    <span
-                      key={k}
-                      className="text-xs px-2.5 py-1 rounded-md bg-surface-1 border border-border-subtle text-text-secondary"
-                    >
-                      <span className="text-text-tertiary">{humanize(k)}:</span>{' '}
-                      <span className="text-text-primary font-medium">{String(v)}</span>
-                    </span>
-                  ))}
+                  {Object.entries(data.totals).map(([k, v]) => {
+                    const d = data.deltas?.[k];
+                    return (
+                      <span
+                        key={k}
+                        className="text-xs px-2.5 py-1 rounded-md bg-surface-1 border border-border-subtle text-text-secondary flex items-center gap-1.5"
+                      >
+                        <span className="text-text-tertiary">{humanize(k)}:</span>
+                        <span className="text-text-primary font-medium">{String(v)}</span>
+                        {compare && typeof d === 'number' && <DeltaChip pct={d} />}
+                      </span>
+                    );
+                  })}
                 </div>
               )}
 
@@ -816,6 +864,13 @@ export default function ReportsPage() {
                 <div className="p-16 text-center text-text-tertiary">Loading report…</div>
               ) : rows.length === 0 ? (
                 <div className="p-16 text-center text-text-tertiary">No data for the selected filters.</div>
+              ) : isHeatmap ? (
+                <div className="p-5">
+                  <ReportHeatmap rows={rows} metric="totalEntries" />
+                  <p className="text-xs text-text-tertiary mt-3">
+                    Each cell is one hour on that weekday — purple intensity scales with entries.
+                  </p>
+                </div>
               ) : view === 'chart' ? (
                 <div className="p-5">
                   <ReportChart
@@ -825,9 +880,12 @@ export default function ReportsPage() {
                       !selectedColumns?.length || effectiveColumns.includes(s.key),
                     )}
                     type={isTimeGroup ? 'line' : 'bar'}
+                    priorRows={compare ? (data?.prior?.rows ?? null) : null}
                   />
                   <p className="text-xs text-text-tertiary mt-3">
-                    Switch to Table to drill into the records behind each bar — every row opens a side panel with all underlying records.
+                    {compare
+                      ? 'Solid = this period, dashed = prior period. Hover any bar/point for exact values.'
+                      : 'Switch to Table to drill into the records behind each bar — every row opens a side panel.'}
                   </p>
                 </div>
               ) : (
@@ -977,11 +1035,48 @@ export default function ReportsPage() {
   );
 }
 
-function Kpi({ label, value }: { label: string; value: string | number }) {
+function Kpi({
+  label,
+  value,
+  delta,
+  invertColor,
+}: {
+  label: string;
+  value: string | number;
+  delta?: number;
+  /** For "Rejected" etc. where an increase is bad. */
+  invertColor?: boolean;
+}) {
   return (
     <div className="rounded-xl border border-border-subtle bg-surface-1 px-4 py-3">
       <div className="text-2xl font-bold text-text-primary tabular-nums">{value}</div>
-      <div className="text-xs text-text-tertiary mt-0.5">{label}</div>
+      <div className="flex items-center justify-between mt-0.5 gap-2">
+        <div className="text-xs text-text-tertiary truncate">{label}</div>
+        {typeof delta === 'number' && <DeltaChip pct={delta} invertColor={invertColor} small />}
+      </div>
     </div>
+  );
+}
+
+function DeltaChip({ pct, invertColor, small }: { pct: number; invertColor?: boolean; small?: boolean }) {
+  const positive = pct > 0;
+  const flat = pct === 0;
+  const good = invertColor ? !positive : positive;
+  const cls = flat
+    ? 'bg-surface-2 text-text-tertiary'
+    : good
+      ? 'bg-emerald-500/15 text-emerald-300'
+      : 'bg-red-500/15 text-red-300';
+  const Icon = flat ? Minus : positive ? TrendingUp : TrendingDown;
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 rounded ${cls} ${
+        small ? 'px-1.5 py-0 text-[10px]' : 'px-1.5 py-0.5 text-[11px]'
+      } font-medium tabular-nums`}
+      title={`${positive ? '+' : ''}${pct}% vs prior period`}
+    >
+      <Icon className={small ? 'w-2.5 h-2.5' : 'w-3 h-3'} />
+      {Math.abs(pct)}%
+    </span>
   );
 }

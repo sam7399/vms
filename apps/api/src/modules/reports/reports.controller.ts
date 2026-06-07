@@ -28,6 +28,7 @@ export class ReportsController {
       contractorId: q.contractorId,
       groupBy: q.groupBy,
       columns: q.columns ? q.columns.split(',').map((c) => c.trim()).filter(Boolean) : undefined,
+      compare: q.compare === 'true' || q.compare === '1',
     };
   }
 
@@ -38,57 +39,57 @@ export class ReportsController {
 
   @Get('overview')
   overview(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
-    return this.reports.overview(user, this.filter(q));
+    return this.reports.runCompared(user, this.filter(q), (u, f) => this.reports.overview(u, f) as any);
   }
 
   @Get('visits')
   visits(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
-    return this.reports.visits(user, this.filter(q));
+    return this.reports.runCompared(user, this.filter(q), (u, f) => this.reports.visits(u, f));
   }
 
   @Get('workforce')
   workforce(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
-    return this.reports.workforce(user, this.filter(q));
+    return this.reports.runCompared(user, this.filter(q), (u, f) => this.reports.workforce(u, f));
   }
 
   @Get('contractors')
   contractors(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
-    return this.reports.contractors(user, this.filter(q));
+    return this.reports.runCompared(user, this.filter(q), (u, f) => this.reports.contractors(u, f));
   }
 
   @Get('branches')
   branches(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
-    return this.reports.branches(user, this.filter(q));
+    return this.reports.runCompared(user, this.filter(q), (u, f) => this.reports.branches(u, f));
   }
 
   @Get('users')
   users(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
-    return this.reports.users(user, this.filter(q));
+    return this.reports.runCompared(user, this.filter(q), (u, f) => this.reports.users(u, f));
   }
 
   @Get('materials')
   materials(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
-    return this.reports.materials(user, this.filter(q));
+    return this.reports.runCompared(user, this.filter(q), (u, f) => this.reports.materials(u, f));
   }
 
   @Get('incidents')
   incidents(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
-    return this.reports.incidents(user, this.filter(q));
+    return this.reports.runCompared(user, this.filter(q), (u, f) => this.reports.incidents(u, f));
   }
 
   @Get('audit')
   audit(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
-    return this.reports.audit(user, this.filter(q));
+    return this.reports.runCompared(user, this.filter(q), (u, f) => this.reports.audit(u, f));
   }
 
   @Get('vehicles')
   vehicles(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
-    return this.reports.vehicles(user, this.filter(q));
+    return this.reports.runCompared(user, this.filter(q), (u, f) => this.reports.vehicles(u, f));
   }
 
   @Get('gate-activity')
   gateActivity(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
-    return this.reports.gateActivity(user, this.filter(q));
+    return this.reports.runCompared(user, this.filter(q), (u, f) => this.reports.gateActivity(u, f));
   }
 
   // ── Ad-hoc "email this report now" ────────────────────────────────

@@ -16,6 +16,13 @@ interface Props {
   type: 'bar' | 'line';
   /** Cap rendered categories (rows assumed pre-sorted). */
   max?: number;
+  /**
+   * Optional prior-period rows used when comparison mode is on. Joined to
+   * `rows` by ordinal index (matches the time bucketing of the current
+   * period). Rendered as dashed / dimmed lines for line charts, or as
+   * pale outlined bars stacked to the left of each current bar.
+   */
+  priorRows?: Record<string, any>[] | null;
 }
 
 const W = 900;
@@ -25,9 +32,10 @@ const PAD_R = 16;
 const PAD_T = 16;
 const PAD_B = 56;
 
-export function ReportChart({ rows, labelKey, series, type, max = 24 }: Props) {
+export function ReportChart({ rows, labelKey, series, type, max = 24, priorRows = null }: Props) {
   const [hover, setHover] = useState<number | null>(null);
   const data = rows.slice(0, max);
+  const prior = priorRows ? priorRows.slice(0, max) : null;
   if (data.length === 0 || series.length === 0) return null;
 
   const innerW = W - PAD_L - PAD_R;
@@ -35,6 +43,7 @@ export function ReportChart({ rows, labelKey, series, type, max = 24 }: Props) {
   const maxVal = Math.max(
     1,
     ...data.flatMap((d) => series.map((s) => Number(d[s.key]) || 0)),
+    ...(prior ? prior.flatMap((d) => series.map((s) => Number(d[s.key]) || 0)) : []),
   );
   const y = (v: number) => PAD_T + innerH - (v / maxVal) * innerH;
   const label = (d: any) => String(d[labelKey] ?? '—');
@@ -61,7 +70,8 @@ export function ReportChart({ rows, labelKey, series, type, max = 24 }: Props) {
           ? data.map((d, i) => {
               const groupW = innerW / data.length;
               const barGap = Math.min(6, groupW * 0.1);
-              const barW = (groupW - barGap) / series.length;
+              const barSlots = prior ? series.length * 2 : series.length;
+              const barW = (groupW - barGap) / barSlots;
               const x0 = PAD_L + groupW * i + barGap / 2;
               return (
                 <g
@@ -74,39 +84,82 @@ export function ReportChart({ rows, labelKey, series, type, max = 24 }: Props) {
                   )}
                   {series.map((s, si) => {
                     const v = Number(d[s.key]) || 0;
-                    const bx = x0 + barW * si;
+                    const pv = prior?.[i] ? Number(prior[i][s.key]) || 0 : null;
+                    const slotIdx = prior ? si * 2 : si;
+                    const bx = x0 + barW * slotIdx;
                     const by = y(v);
                     return (
-                      <rect
-                        key={s.key}
-                        x={bx}
-                        y={by}
-                        width={Math.max(1, barW - 1)}
-                        height={PAD_T + innerH - by}
-                        fill={s.color}
-                        rx={2}
-                      >
-                        <title>{`${label(d)} · ${s.label}: ${v}`}</title>
-                      </rect>
+                      <g key={s.key}>
+                        {pv !== null && (
+                          <rect
+                            x={bx}
+                            y={y(pv)}
+                            width={Math.max(1, barW - 1)}
+                            height={PAD_T + innerH - y(pv)}
+                            fill={s.color}
+                            opacity={0.25}
+                            rx={2}
+                          >
+                            <title>{`${label(d)} · ${s.label} (prior): ${pv}`}</title>
+                          </rect>
+                        )}
+                        <rect
+                          x={pv !== null ? bx + barW : bx}
+                          y={by}
+                          width={Math.max(1, barW - 1)}
+                          height={PAD_T + innerH - by}
+                          fill={s.color}
+                          rx={2}
+                        >
+                          <title>{`${label(d)} · ${s.label}: ${v}`}</title>
+                        </rect>
+                      </g>
                     );
                   })}
                 </g>
               );
             })
-          : series.map((s) => {
-              const step = data.length > 1 ? innerW / (data.length - 1) : 0;
-              const pts = data.map((d, i) => `${PAD_L + step * i},${y(Number(d[s.key]) || 0)}`);
-              return (
-                <g key={s.key}>
-                  <polyline points={pts.join(' ')} fill="none" stroke={s.color} strokeWidth={2} />
-                  {data.map((d, i) => (
-                    <circle key={i} cx={PAD_L + step * i} cy={y(Number(d[s.key]) || 0)} r={2.5} fill={s.color}>
-                      <title>{`${label(d)} · ${s.label}: ${Number(d[s.key]) || 0}`}</title>
-                    </circle>
-                  ))}
-                </g>
-              );
-            })}
+          : (
+            <>
+              {prior &&
+                series.map((s) => {
+                  const step = prior.length > 1 ? innerW / (prior.length - 1) : 0;
+                  const pts = prior.map((d, i) => `${PAD_L + step * i},${y(Number(d[s.key]) || 0)}`);
+                  return (
+                    <g key={`prior-${s.key}`}>
+                      <polyline
+                        points={pts.join(' ')}
+                        fill="none"
+                        stroke={s.color}
+                        strokeWidth={1.5}
+                        strokeDasharray="4 3"
+                        opacity={0.55}
+                      />
+                    </g>
+                  );
+                })}
+              {series.map((s) => {
+                const step = data.length > 1 ? innerW / (data.length - 1) : 0;
+                const pts = data.map((d, i) => `${PAD_L + step * i},${y(Number(d[s.key]) || 0)}`);
+                return (
+                  <g key={s.key}>
+                    <polyline points={pts.join(' ')} fill="none" stroke={s.color} strokeWidth={2} />
+                    {data.map((d, i) => (
+                      <circle
+                        key={i}
+                        cx={PAD_L + step * i}
+                        cy={y(Number(d[s.key]) || 0)}
+                        r={2.5}
+                        fill={s.color}
+                      >
+                        <title>{`${label(d)} · ${s.label}: ${Number(d[s.key]) || 0}`}</title>
+                      </circle>
+                    ))}
+                  </g>
+                );
+              })}
+            </>
+          )}
 
         {/* x labels */}
         {data.map((d, i) => {
@@ -139,6 +192,12 @@ export function ReportChart({ rows, labelKey, series, type, max = 24 }: Props) {
             {s.label}
           </div>
         ))}
+        {prior && (
+          <div className="flex items-center gap-1.5 text-xs text-zinc-500 ml-auto">
+            <span className="inline-block w-4 h-0 border-t-[2px] border-dashed border-zinc-400" />
+            <span>prior period</span>
+          </div>
+        )}
         {rows.length > max && <span className="text-xs text-zinc-600">showing top {max} of {rows.length}</span>}
       </div>
     </div>

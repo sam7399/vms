@@ -29,6 +29,8 @@ export interface ReportFilter {
   groupBy?: string;
   /** Optional column projection — output rows keep only these keys, in order. */
   columns?: string[];
+  /** When true, the service also computes the same query for the prior window and returns deltas. */
+  compare?: boolean;
 }
 
 type Period = 'day' | 'week' | 'month' | 'year';
@@ -683,27 +685,31 @@ export class ReportsService {
       ? this.round(contractors.reduce((s, c) => s + c.complianceScore, 0) / contractors.length, 1)
       : null;
 
+    const kpis = {
+      totalVisits: visits.length,
+      uniqueVisitors: new Set(visits.map((v) => v.visitorId)).size,
+      totalHeadcount: visits.reduce((s, v) => s + (v.groupSize || 1), 0),
+      checkedInVisits: visits.filter((v) => v.status === 'CHECKED_IN').length,
+      completedVisits: visits.filter((v) => v.status === 'CHECKED_OUT').length,
+      rejectedVisits: visits.filter((v) => v.status === 'REJECTED').length,
+      avgVisitDurationMin: durations.length
+        ? this.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+        : null,
+      attendanceRecords: attendance.length,
+      uniqueWorkersOnSite: new Set(attendance.map((a) => a.workerId)).size,
+      totalWorkerHours: this.round(workerHours),
+      contractors: contractors.length,
+      totalWorkers: workerCount,
+      activeWorkers: activeWorkerCount,
+      avgComplianceScore: avgCompliance,
+    };
     return {
       report: 'overview',
       range: { from: from.toISOString(), to: to.toISOString() },
-      kpis: {
-        totalVisits: visits.length,
-        uniqueVisitors: new Set(visits.map((v) => v.visitorId)).size,
-        totalHeadcount: visits.reduce((s, v) => s + (v.groupSize || 1), 0),
-        checkedInVisits: visits.filter((v) => v.status === 'CHECKED_IN').length,
-        completedVisits: visits.filter((v) => v.status === 'CHECKED_OUT').length,
-        rejectedVisits: visits.filter((v) => v.status === 'REJECTED').length,
-        avgVisitDurationMin: durations.length
-          ? this.round(durations.reduce((a, b) => a + b, 0) / durations.length)
-          : null,
-        attendanceRecords: attendance.length,
-        uniqueWorkersOnSite: new Set(attendance.map((a) => a.workerId)).size,
-        totalWorkerHours: this.round(workerHours),
-        contractors: contractors.length,
-        totalWorkers: workerCount,
-        activeWorkers: activeWorkerCount,
-        avgComplianceScore: avgCompliance,
-      },
+      kpis,
+      // Aliased for runCompared() so it can compute period deltas uniformly.
+      totals: kpis,
+      rows: [] as any[],
     };
   }
 
@@ -1147,43 +1153,68 @@ export class ReportsService {
       }),
     ]);
 
-    type Cell = { visitorEntries: number; visitorExits: number; workerEntries: number; workerExits: number };
+    type Cell = {
+      visitorEntries: number;
+      visitorExits: number;
+      workerEntries: number;
+      workerExits: number;
+      /** For heatmap rows only — day-of-week (0=Sun) and hour 0..23. */
+      dow?: number;
+      hour?: number;
+    };
     const groups = new Map<string, Cell>();
-    const ensure = (k: string) => {
+    const ensure = (k: string, init?: Partial<Cell>) => {
       let g = groups.get(k);
       if (!g) {
-        g = { visitorEntries: 0, visitorExits: 0, workerEntries: 0, workerExits: 0 };
+        g = { visitorEntries: 0, visitorExits: 0, workerEntries: 0, workerExits: 0, ...init };
         groups.set(k, g);
       }
       return g;
     };
+    const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-    const branchOrTime = (when: Date, branch: string | undefined) =>
-      groupBy === 'branch' ? branch || '—' :
-      groupBy === 'hour' ? `${String(new Date(when).getUTCHours()).padStart(2, '0')}:00` :
-      this.periodKey(when, (groupBy === 'hour' ? 'day' : groupBy) as Period);
+    const keyFor = (when: Date, branch: string | undefined) => {
+      if (groupBy === 'branch') return { key: branch || '—' };
+      if (groupBy === 'hour') return { key: `${String(when.getUTCHours()).padStart(2, '0')}:00` };
+      if (groupBy === 'heatmap') {
+        const dow = when.getUTCDay();
+        const hour = when.getUTCHours();
+        return {
+          key: `${DOW[dow]} ${String(hour).padStart(2, '0')}:00`,
+          init: { dow, hour },
+        };
+      }
+      return { key: this.periodKey(when, groupBy as Period) };
+    };
 
     for (const v of visits) {
       if (!v.actualEntry) continue;
-      const g = ensure(branchOrTime(v.actualEntry, v.branch?.name));
+      const { key, init } = keyFor(v.actualEntry, v.branch?.name);
+      const g = ensure(key, init);
       g.visitorEntries += 1;
       if (v.actualExit) g.visitorExits += 1;
     }
     for (const a of attendance) {
-      const g = ensure(branchOrTime(a.checkIn, a.branch?.name));
+      const { key, init } = keyFor(a.checkIn, a.branch?.name);
+      const g = ensure(key, init);
       g.workerEntries += 1;
       if (a.checkOut) g.workerExits += 1;
     }
 
     const rows = [...groups.entries()].map(([group, c]) => ({
       group,
+      ...(groupBy === 'heatmap' ? { dow: c.dow, hour: c.hour } : {}),
       visitorEntries: c.visitorEntries,
       visitorExits: c.visitorExits,
       workerEntries: c.workerEntries,
       workerExits: c.workerExits,
       totalEntries: c.visitorEntries + c.workerEntries,
     }));
-    this.sortRows(rows, groupBy === 'hour' ? 'day' : groupBy);
+    if (groupBy === 'heatmap') {
+      rows.sort((a, b) => (a.dow! - b.dow!) || (a.hour! - b.hour!));
+    } else {
+      this.sortRows(rows, groupBy === 'hour' ? 'day' : groupBy);
+    }
 
     return {
       report: 'gate-activity',
@@ -1260,6 +1291,57 @@ export class ReportsService {
     const title = report.charAt(0).toUpperCase() + report.slice(1).replace(/-/g, ' ');
     const rows = res.rows ?? [];
     return { title, rows: f.columns ? this.projectColumns(rows, f.columns) : rows };
+  }
+
+  // ── Period-over-period comparison wrapper ─────────────────────────
+
+  /**
+   * Returns a window of the same length immediately before `f`. Used by
+   * runCompared() so any report can be re-run for the prior period and
+   * the client can compute trend deltas.
+   */
+  priorWindow(f: ReportFilter): { from: string; to: string } {
+    const { from, to } = this.resolveRange(f);
+    const span = Math.max(DAY_MS, to.getTime() - from.getTime());
+    const priorTo = new Date(from.getTime() - 1);
+    const priorFrom = new Date(priorTo.getTime() - span);
+    return {
+      from: priorFrom.toISOString().slice(0, 10),
+      to: priorTo.toISOString().slice(0, 10),
+    };
+  }
+
+  /** Pct change (rounded to 1 decimal). 0 when prior is 0, sign preserved. */
+  pctDeltas(current: Record<string, any> | undefined, prior: Record<string, any> | undefined): Record<string, number> {
+    const out: Record<string, number> = {};
+    if (!current || !prior) return out;
+    for (const [k, v] of Object.entries(current)) {
+      if (typeof v === 'number' && typeof prior[k] === 'number') {
+        const denom = (prior[k] as number) || 0;
+        out[k] = denom ? Math.round(((v - denom) / denom) * 1000) / 10 : 0;
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Run any report-producing function. If the filter has compare=true,
+   * also runs it for the prior window and attaches { prior, deltas }.
+   */
+  async runCompared<T extends { totals?: any; rows: any[]; range?: { from: string; to: string } }>(
+    user: JwtUser,
+    f: ReportFilter,
+    fn: (u: JwtUser, ff: ReportFilter) => Promise<T>,
+  ): Promise<T & { prior?: T; deltas?: Record<string, number> }> {
+    const current = await fn(user, f);
+    if (!f.compare) return current as any;
+    const priorRange = this.priorWindow(f);
+    const prior = await fn(user, { ...f, from: priorRange.from, to: priorRange.to, compare: false });
+    return {
+      ...current,
+      prior,
+      deltas: this.pctDeltas(current.totals, prior.totals),
+    } as any;
   }
 
   /** Trim each row to the user-selected columns (preserves order). */

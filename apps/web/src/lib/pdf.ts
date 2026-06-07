@@ -14,6 +14,15 @@ interface PdfMeta {
   generatedBy?: string;
   /** Brand line printed bottom-right of every page. */
   brand?: string;
+  /**
+   * If comparison mode is active, the prior-period totals and
+   * computed pct deltas are rendered as a strip under the KPIs.
+   */
+  comparison?: {
+    priorRange?: { from: string; to: string };
+    priorTotals?: Record<string, any>;
+    deltas?: Record<string, number>;
+  };
 }
 
 const BRAND_PRIMARY: [number, number, number] = [124, 58, 237]; // #7C3AED (brand-600)
@@ -123,6 +132,41 @@ export function downloadPDF(
       doc.text(k.label.toUpperCase(), cx, cursorY + 36, { align: 'center' });
     }
     cursorY += 56;
+  }
+
+  // ── Comparison block ────────────────────────────────────────────
+  if (meta.comparison && (meta.comparison.priorTotals || meta.comparison.deltas)) {
+    const c = meta.comparison;
+    doc.setFontSize(8);
+    doc.setTextColor(...MUTED);
+    const rangeText = c.priorRange ? ` (${c.priorRange.from} → ${c.priorRange.to})` : '';
+    doc.text(`VS PRIOR PERIOD${rangeText}`, M, cursorY);
+    cursorY += 12;
+
+    if (c.deltas) {
+      doc.setFontSize(9);
+      let x = M;
+      const chipPad = 6;
+      for (const [k, pct] of Object.entries(c.deltas)) {
+        const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '–';
+        const text = `${k.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()).trim()}: ${arrow} ${Math.abs(pct)}%`;
+        const w = doc.getTextWidth(text) + chipPad * 2;
+        if (x + w > pageW - M) {
+          x = M;
+          cursorY += 16;
+        }
+        // Green if change is positive, red if negative, gray if flat.
+        const fill: [number, number, number] = pct > 0 ? [220, 252, 231] : pct < 0 ? [254, 226, 226] : [241, 245, 249];
+        const ink: [number, number, number] = pct > 0 ? [21, 128, 61] : pct < 0 ? [185, 28, 28] : MUTED;
+        doc.setFillColor(...fill);
+        doc.setDrawColor(...HAIRLINE);
+        doc.roundedRect(x, cursorY - 9, w, 13, 3, 3, 'FD');
+        doc.setTextColor(...ink);
+        doc.text(text, x + chipPad, cursorY);
+        x += w + 5;
+      }
+      cursorY += 14;
+    }
   }
 
   // ── Table ────────────────────────────────────────────────────────
