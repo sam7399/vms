@@ -713,6 +713,227 @@ export class ReportsService {
     };
   }
 
+  // ── Executive dashboard ────────────────────────────────────────────
+
+  /**
+   * Single-shot leadership view: KPIs, top performers, daily trends and
+   * risk indicators. Designed for the /executive page so the C-suite can
+   * open one URL and have a complete read.
+   */
+  async executive(user: JwtUser, f: ReportFilter) {
+    const { from, to } = this.resolveRange(f);
+    const branchFilter = f.branchId ? { branchId: f.branchId } : {};
+
+    const [
+      visits,
+      attendance,
+      contractors,
+      workerCount,
+      activeWorkerCount,
+      incidents,
+      branches,
+    ] = await Promise.all([
+      this.prisma.visit.findMany({
+        where: { createdAt: { gte: from, lte: to }, ...visitScope(user), ...branchFilter },
+        select: {
+          status: true,
+          visitorId: true,
+          groupSize: true,
+          createdAt: true,
+          actualEntry: true,
+          actualExit: true,
+          visitor: { select: { company: true } },
+          host: { select: { fullName: true, branch: { select: { name: true } } } },
+          branch: { select: { name: true } },
+        },
+      }),
+      this.prisma.attendance.findMany({
+        where: { checkIn: { gte: from, lte: to }, ...attendanceScope(user), ...branchFilter },
+        select: {
+          workerId: true,
+          checkIn: true,
+          checkOut: true,
+          worker: { select: { contractor: { select: { id: true, companyName: true, complianceScore: true } } } },
+        },
+      }),
+      this.prisma.contractor.findMany({
+        where: contractorScope(user),
+        select: {
+          id: true,
+          companyName: true,
+          complianceScore: true,
+          workers: {
+            select: { id: true, isActive: true, policeVerified: true, medicalExpiry: true },
+          },
+        },
+      }),
+      this.prisma.worker.count({
+        where: isSuperAdmin(user) ? {} : { contractor: { organizationId: requireOrg(user) } },
+      }),
+      this.prisma.worker.count({
+        where: { isActive: true, ...(isSuperAdmin(user) ? {} : { contractor: { organizationId: requireOrg(user) } }) },
+      }),
+      this.prisma.incident.findMany({
+        where: {
+          openedAt: { gte: from, lte: to },
+          ...(isSuperAdmin(user) ? {} : { orgId: requireOrg(user) }),
+          ...(f.branchId ? { branchId: f.branchId } : {}),
+        },
+        select: {
+          status: true,
+          severity: true,
+          openedAt: true,
+          closedAt: true,
+        },
+      }),
+      this.prisma.branch.findMany({
+        where: isSuperAdmin(user) ? {} : { organizationId: requireOrg(user) },
+        select: { id: true, name: true, location: true },
+      }),
+    ]);
+
+    // KPIs
+    const durations = visits
+      .filter((v) => v.actualEntry && v.actualExit)
+      .map((v) => (v.actualExit!.getTime() - v.actualEntry!.getTime()) / 60_000)
+      .filter((m) => m > 0);
+    let workerHours = 0;
+    for (const a of attendance) {
+      if (a.checkOut) workerHours += Math.max(0, (a.checkOut.getTime() - a.checkIn.getTime()) / HOUR_MS);
+    }
+    const avgCompliance = contractors.length
+      ? this.round(contractors.reduce((s, c) => s + c.complianceScore, 0) / contractors.length, 1)
+      : 0;
+    const openIncidents = incidents.filter((i) => i.status === 'open' || i.status === 'investigating').length;
+
+    const kpis = {
+      totalVisits: visits.length,
+      uniqueVisitors: new Set(visits.map((v) => v.visitorId)).size,
+      totalHeadcount: visits.reduce((s, v) => s + (v.groupSize || 1), 0),
+      checkedInVisits: visits.filter((v) => v.status === 'CHECKED_IN').length,
+      rejectedVisits: visits.filter((v) => v.status === 'REJECTED').length,
+      avgVisitDurationMin: durations.length
+        ? this.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+        : 0,
+      totalWorkerHours: this.round(workerHours),
+      uniqueWorkersOnSite: new Set(attendance.map((a) => a.workerId)).size,
+      contractors: contractors.length,
+      totalWorkers: workerCount,
+      activeWorkers: activeWorkerCount,
+      avgComplianceScore: avgCompliance,
+      openIncidents,
+    };
+
+    // Top hosts (by visits hosted)
+    const hostMap = new Map<string, { name: string; branch: string; total: number }>();
+    for (const v of visits) {
+      const key = v.host?.fullName || '—';
+      const entry = hostMap.get(key) || { name: key, branch: v.host?.branch?.name || '—', total: 0 };
+      entry.total += 1;
+      hostMap.set(key, entry);
+    }
+    const topHosts = [...hostMap.values()].sort((a, b) => b.total - a.total).slice(0, 5);
+
+    // Top contractors (by hours, with on-site count)
+    const ctMap = new Map<string, { name: string; hours: number; onSite: Set<string>; complianceScore: number }>();
+    for (const a of attendance) {
+      const c = a.worker?.contractor;
+      if (!c) continue;
+      const entry = ctMap.get(c.id) || { name: c.companyName, hours: 0, onSite: new Set(), complianceScore: c.complianceScore };
+      if (a.checkOut) entry.hours += Math.max(0, (a.checkOut.getTime() - a.checkIn.getTime()) / HOUR_MS);
+      entry.onSite.add(a.workerId);
+      ctMap.set(c.id, entry);
+    }
+    const topContractors = [...ctMap.values()]
+      .sort((a, b) => b.hours - a.hours)
+      .slice(0, 5)
+      .map((c) => ({
+        name: c.name,
+        hours: this.round(c.hours),
+        workersOnSite: c.onSite.size,
+        complianceScore: c.complianceScore,
+      }));
+
+    // Top visitor companies
+    const companyMap = new Map<string, number>();
+    for (const v of visits) {
+      const k = v.visitor?.company?.trim();
+      if (!k) continue;
+      companyMap.set(k, (companyMap.get(k) || 0) + 1);
+    }
+    const topCompanies = [...companyMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, visits]) => ({ name, visits }));
+
+    // Top branches (by visits + worker hours)
+    const branchMap = new Map<string, { name: string; visits: number; workerHours: number }>();
+    for (const b of branches) branchMap.set(b.name, { name: b.name, visits: 0, workerHours: 0 });
+    for (const v of visits) {
+      const k = v.branch?.name;
+      if (!k) continue;
+      const entry = branchMap.get(k) || { name: k, visits: 0, workerHours: 0 };
+      entry.visits += 1;
+      branchMap.set(k, entry);
+    }
+    const topBranches = [...branchMap.values()].sort((a, b) => b.visits - a.visits).slice(0, 5);
+
+    // Daily visits trend
+    const dailyMap = new Map<string, { date: string; visits: number; workerHours: number }>();
+    for (const v of visits) {
+      const k = this.periodKey(v.createdAt, 'day');
+      const e = dailyMap.get(k) || { date: k, visits: 0, workerHours: 0 };
+      e.visits += 1;
+      dailyMap.set(k, e);
+    }
+    for (const a of attendance) {
+      const k = this.periodKey(a.checkIn, 'day');
+      const e = dailyMap.get(k) || { date: k, visits: 0, workerHours: 0 };
+      if (a.checkOut) e.workerHours += Math.max(0, (a.checkOut.getTime() - a.checkIn.getTime()) / HOUR_MS);
+      dailyMap.set(k, e);
+    }
+    const trend = [...dailyMap.values()]
+      .map((d) => ({ ...d, workerHours: this.round(d.workerHours) }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Incident breakdown
+    const incidentsBySeverity: Record<string, number> = { sev1: 0, sev2: 0, sev3: 0, sev4: 0, sev5: 0 };
+    const incidentsByStatus: Record<string, number> = { open: 0, investigating: 0, resolved: 0, false_positive: 0 };
+    for (const i of incidents) {
+      const sk = `sev${Math.min(5, Math.max(1, i.severity || 1))}`;
+      incidentsBySeverity[sk] = (incidentsBySeverity[sk] || 0) + 1;
+      incidentsByStatus[i.status] = (incidentsByStatus[i.status] || 0) + 1;
+    }
+
+    // Risk indicators
+    const now = Date.now();
+    const SEVEN_DAYS = 7 * DAY_MS;
+    const allWorkers = contractors.flatMap((c) => c.workers);
+    const risk = {
+      expiredMedicals: allWorkers.filter((w) => w.medicalExpiry && w.medicalExpiry.getTime() < now).length,
+      policeUnverified: allWorkers.filter((w) => !w.policeVerified).length,
+      openIncidentsAged: incidents.filter(
+        (i) => (i.status === 'open' || i.status === 'investigating') && now - i.openedAt.getTime() > SEVEN_DAYS,
+      ).length,
+      contractorsBelowCompliance: contractors.filter((c) => c.complianceScore < 70).length,
+    };
+
+    return {
+      report: 'executive',
+      range: { from: from.toISOString(), to: to.toISOString() },
+      kpis,
+      totals: kpis, // alias so runCompared can produce deltas uniformly
+      rows: trend as any[], // rows = daily trend
+      topHosts,
+      topContractors,
+      topCompanies,
+      topBranches,
+      incidentsBySeverity,
+      incidentsByStatus,
+      risk,
+    };
+  }
+
   // ── Drill-down: raw records behind one grouped row ────────────────
 
   /** Convert a time-bucket label back into an absolute [from,to] window. */

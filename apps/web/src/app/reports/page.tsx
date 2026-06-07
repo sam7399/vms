@@ -34,6 +34,7 @@ import { DownloadCenter, type ExportFormat, type ExportScope } from '@/component
 import { ColumnSelector } from '@/components/reports/ColumnSelector';
 import { DrillDrawer } from '@/components/reports/DrillDrawer';
 import { TemplatesPanel, type Template } from '@/components/reports/TemplatesPanel';
+import { ExportHistoryPanel } from '@/components/reports/ExportHistoryPanel';
 
 // ───────────────────────────────────────────────────────────────────
 // Helpers
@@ -539,6 +540,22 @@ export default function ReportsPage() {
         kind: 'ok',
         text: `${activeMeta.label} exported as ${fmt.toUpperCase()} (${scope})`,
       });
+
+      // Best-effort audit log; don't fail the UX on log error.
+      apiPost('/reports/exports', {
+        report: activeKey,
+        format: fmt,
+        scope,
+        rowCount: (scope === 'summary' ? summaryRows.length : exportRows.length),
+        filters: {
+          from,
+          to,
+          groupBy,
+          branchId: render.useBranch ? branchId : undefined,
+          contractorId: render.useContractor ? contractorId : undefined,
+          columns: selectedColumns?.length ? selectedColumns.join(',') : undefined,
+        },
+      }).catch(() => {});
     } catch (e) {
       setNotice({ kind: 'err', text: e instanceof Error ? e.message : 'Export failed' });
     } finally {
@@ -933,6 +950,8 @@ export default function ReportsPage() {
           {/* Right rail */}
           <aside className="w-full lg:w-72 shrink-0 space-y-4">
             <TemplatesPanel onApply={applyTemplate} buildSnapshot={buildSnapshot} />
+
+            <ExportHistoryPanel />
 
             <details className="group rounded-2xl border border-border-subtle bg-surface-1 overflow-hidden">
               <summary className="cursor-pointer list-none flex items-center justify-between gap-3 p-4 hover:bg-surface-2">

@@ -850,6 +850,33 @@ model ReportTemplate {
   @@index([report])
 }
 
+// ─────────────────────────────────────────────────────────────
+// Reporting — append-only audit log of every export and email
+// out of the reporting center. Required for SOX / compliance
+// review trails; viewer lives in /reports right rail.
+// ─────────────────────────────────────────────────────────────
+model ReportExport {
+  id          String   @id @default(uuid())
+  orgId       String?  @db.VarChar(100)
+  actorId     String?  @db.VarChar(100)
+  actorEmail  String?  @db.VarChar(255)
+  report      String   @db.VarChar(40)
+  /// xlsx | csv | pdf | json | xml | print | email
+  format      String   @db.VarChar(20)
+  /// current | full | summary | email
+  scope       String   @db.VarChar(20)
+  rowCount    Int      @default(0)
+  /// Serialized filter snapshot (from, to, groupBy, branchId etc.)
+  filters     Json?
+  /// For email exports: comma-separated recipients
+  recipients  String?  @db.VarChar(1000)
+  createdAt   DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([actorId])
+  @@index([report])
+}
+
 model VisitorDocument {
   id              String         @id @default(uuid())
   visitorId       String

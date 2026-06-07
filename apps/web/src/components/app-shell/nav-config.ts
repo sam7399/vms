@@ -92,6 +92,7 @@ export const NAV_SECTIONS: NavSection[] = [
     i18nKey: 'nav.insights',
     icon: BarChart3,
     items: [
+      { href: '/executive', i18nKey: 'nav.executive' },
       { href: '/reports', i18nKey: 'nav.reports' },
       { href: '/audit', i18nKey: 'nav.audit' },
       { href: '/notices', i18nKey: 'nav.notices' },

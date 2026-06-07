@@ -56,6 +56,7 @@ const CATEGORIES: Category[] = [
     key: 'nav.insights',
     icon: BarChart3,
     items: [
+      { href: '/executive', key: 'nav.executive' },
       { href: '/reports', key: 'nav.reports' },
       { href: '/audit', key: 'nav.audit' },
       { href: '/notices', key: 'nav.notices' },

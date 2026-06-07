@@ -3,6 +3,7 @@ import { Role } from '@prisma/client';
 import { ReportsService, ReportFilter } from './reports.service';
 import { ReportTemplatesService, TemplateInput } from './report-templates.service';
 import { ReportScheduleService, ScheduleInput } from './report-schedule.service';
+import { ReportExportsService, ExportLogInput } from './report-exports.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -18,6 +19,7 @@ export class ReportsController {
     private readonly reports: ReportsService,
     private readonly schedules: ReportScheduleService,
     private readonly templates: ReportTemplatesService,
+    private readonly exports: ReportExportsService,
   ) {}
 
   private filter(q: Record<string, string | undefined>): ReportFilter {
@@ -40,6 +42,11 @@ export class ReportsController {
   @Get('overview')
   overview(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
     return this.reports.runCompared(user, this.filter(q), (u, f) => this.reports.overview(u, f) as any);
+  }
+
+  @Get('executive')
+  executive(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
+    return this.reports.runCompared(user, this.filter(q), (u, f) => this.reports.executive(u, f) as any);
   }
 
   @Get('visits')
@@ -94,7 +101,7 @@ export class ReportsController {
 
   // ── Ad-hoc "email this report now" ────────────────────────────────
   @Post('email')
-  emailReport(
+  async emailReport(
     @CurrentUser() user: JwtUser,
     @Body()
     body: {
@@ -108,7 +115,25 @@ export class ReportsController {
       subject?: string;
     },
   ) {
-    return this.schedules.emailAdHoc(user, body);
+    const result = await this.schedules.emailAdHoc(user, body);
+    // Best-effort audit log; don't fail the send if logging fails.
+    this.exports
+      .log(user, {
+        report: body.report,
+        format: 'email',
+        scope: 'email',
+        rowCount: result.rows,
+        recipients: body.recipients,
+        filters: {
+          from: body.from,
+          to: body.to,
+          groupBy: body.groupBy,
+          branchId: body.branchId,
+          contractorId: body.contractorId,
+        },
+      })
+      .catch(() => {});
+    return result;
   }
 
   // ── Drill-down: raw records behind a grouped row ──────────────────
@@ -169,6 +194,17 @@ export class ReportsController {
   @Post('templates/:id/favorite')
   favoriteTemplate(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.templates.toggleFavorite(user, id);
+  }
+
+  // ── Export audit trail ────────────────────────────────────────────
+  @Get('exports/list')
+  listExports(@CurrentUser() user: JwtUser, @Query('take') take?: string) {
+    return this.exports.list(user, take ? parseInt(take, 10) : 50);
+  }
+
+  @Post('exports')
+  logExport(@CurrentUser() user: JwtUser, @Body() body: ExportLogInput) {
+    return this.exports.log(user, body);
   }
 
   @Post('schedules/:id/run')
