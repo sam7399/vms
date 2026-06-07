@@ -427,14 +427,23 @@ export default function ReportsPage() {
         )}
 
         {/* ── Report selector tabs ───────────────────────────────── */}
-        <div className="mb-4 flex gap-2 flex-wrap">
+        <div className="mb-4 flex gap-2 flex-wrap relative z-10">
           {REPORTS.map((r) => {
             const Icon = r.icon;
+            const isActive = activeKey === r.key;
             return (
-              <button key={r.key} onClick={() => setActiveKey(r.key)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                  activeKey === r.key ? 'bg-blue-600 text-white' : 'bg-white/5 text-zinc-300 hover:bg-white/10 border border-white/10'
-                }`}>
+              <button
+                key={r.key}
+                type="button"
+                data-active={isActive}
+                data-tab={r.key}
+                onClick={() => setActiveKey(r.key)}
+                className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-[0.98] ${
+                  isActive
+                    ? 'bg-brand-gradient text-white shadow-brand-glow ring-1 ring-brand-400/40'
+                    : 'bg-surface-2 text-text-secondary hover:bg-surface-3 hover:text-text-primary border border-border-subtle'
+                }`}
+              >
                 <Icon className="w-4 h-4" /> {r.label}
               </button>
             );
