@@ -822,6 +822,34 @@ model ReportSchedule {
   @@index([orgId])
 }
 
+// ─────────────────────────────────────────────────────────────
+// Reporting — user-saved report templates.
+// A template captures the report key, group-by, filters and the
+// selected columns so the user can re-open the exact view with a
+// single click from the right-rail "Saved" list.
+// ─────────────────────────────────────────────────────────────
+model ReportTemplate {
+  id           String   @id @default(uuid())
+  orgId        String?  @db.VarChar(100)
+  createdBy    String   @db.VarChar(100)
+  name         String   @db.VarChar(160)
+  /// visits | workforce | contractors | branches | users | materials | incidents | audit | vehicles | gate-activity
+  report       String   @db.VarChar(40)
+  groupBy      String?  @db.VarChar(40)
+  branchId     String?  @db.VarChar(100)
+  contractorId String?  @db.VarChar(100)
+  rangePreset  String   @default("thisMonth") @db.VarChar(40)
+  /// comma-separated column keys (subset of the report's columns).
+  /// null/empty = all columns
+  columns      String?  @db.VarChar(2000)
+  isFavorite   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([orgId, createdBy])
+  @@index([report])
+}
+
 model VisitorDocument {
   id              String         @id @default(uuid())
   visitorId       String

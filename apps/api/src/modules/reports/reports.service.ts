@@ -27,6 +27,8 @@ export interface ReportFilter {
   branchId?: string;
   contractorId?: string;
   groupBy?: string;
+  /** Optional column projection — output rows keep only these keys, in order. */
+  columns?: string[];
 }
 
 type Period = 'day' | 'week' | 'month' | 'year';
@@ -891,6 +893,354 @@ export class ReportsService {
     return { report, value, count: 0, rows: [] };
   }
 
+  // ── Incident reporting ────────────────────────────────────────────
+
+  async incidents(user: JwtUser, f: ReportFilter) {
+    const { from, to } = this.resolveRange(f);
+    const groupBy = f.groupBy || 'month';
+
+    const where: any = {
+      openedAt: { gte: from, lte: to },
+      ...(isSuperAdmin(user) ? {} : { orgId: requireOrg(user) }),
+    };
+    if (f.branchId) where.branchId = f.branchId;
+
+    const items = await this.prisma.incident.findMany({
+      where,
+      select: {
+        id: true,
+        kind: true,
+        severity: true,
+        status: true,
+        title: true,
+        openedAt: true,
+        closedAt: true,
+        branchId: true,
+      },
+    });
+
+    const branches = await this.prisma.branch.findMany({
+      where: isSuperAdmin(user) ? {} : { organizationId: requireOrg(user) },
+      select: { id: true, name: true },
+    });
+    const branchName = new Map(branches.map((b) => [b.id, b.name]));
+
+    const keyFor = (i: (typeof items)[number]) => {
+      switch (groupBy) {
+        case 'branch': return i.branchId ? (branchName.get(i.branchId) || '—') : '—';
+        case 'kind': return i.kind || '—';
+        case 'status': return i.status || '—';
+        case 'severity': return `Sev ${i.severity}`;
+        default: return this.periodKey(i.openedAt, groupBy as Period);
+      }
+    };
+
+    const groups = new Map<string, any>();
+    for (const i of items) {
+      const k = keyFor(i);
+      let g = groups.get(k);
+      if (!g) {
+        g = { group: k, total: 0, open: 0, investigating: 0, resolved: 0, falsePositive: 0, avgSeverity: 0, _sevSum: 0 };
+        groups.set(k, g);
+      }
+      g.total += 1;
+      g._sevSum += i.severity || 0;
+      if (i.status === 'open') g.open += 1;
+      else if (i.status === 'investigating') g.investigating += 1;
+      else if (i.status === 'resolved') g.resolved += 1;
+      else if (i.status === 'false_positive') g.falsePositive += 1;
+    }
+    const rows = [...groups.values()].map((g) => ({
+      group: g.group,
+      total: g.total,
+      open: g.open,
+      investigating: g.investigating,
+      resolved: g.resolved,
+      falsePositive: g.falsePositive,
+      avgSeverity: g.total ? this.round(g._sevSum / g.total, 1) : 0,
+    }));
+    this.sortRows(rows, groupBy);
+
+    return {
+      report: 'incidents',
+      groupBy,
+      range: { from: from.toISOString(), to: to.toISOString() },
+      totals: {
+        incidents: items.length,
+        open: items.filter((i) => i.status === 'open').length,
+        resolved: items.filter((i) => i.status === 'resolved').length,
+        avgSeverity: items.length ? this.round(items.reduce((s, i) => s + (i.severity || 0), 0) / items.length, 1) : 0,
+      },
+      rows,
+    };
+  }
+
+  // ── Audit reporting ───────────────────────────────────────────────
+
+  async audit(user: JwtUser, f: ReportFilter) {
+    const { from, to } = this.resolveRange(f);
+    const groupBy = f.groupBy || 'day';
+
+    const logs = await this.prisma.auditLog.findMany({
+      where: {
+        createdAt: { gte: from, lte: to },
+        // AuditLog rows aren't org-scoped; SUPER_ADMIN only sees them.
+        ...(isSuperAdmin(user) ? {} : { actorRole: { not: 'SUPER_ADMIN' } }),
+      },
+      select: {
+        actorEmail: true,
+        actorRole: true,
+        method: true,
+        path: true,
+        status: true,
+        durationMs: true,
+        ipAddress: true,
+        createdAt: true,
+      },
+      take: 50_000,
+    });
+
+    const keyFor = (l: (typeof logs)[number]) => {
+      switch (groupBy) {
+        case 'actor': return l.actorEmail || 'anonymous';
+        case 'role': return l.actorRole || '—';
+        case 'path': return l.path.slice(0, 80);
+        case 'method': return l.method;
+        case 'status':
+          return l.status >= 500 ? '5xx error' :
+                 l.status >= 400 ? '4xx error' :
+                 l.status >= 300 ? '3xx redirect' : '2xx ok';
+        default: return this.periodKey(l.createdAt, groupBy as Period);
+      }
+    };
+
+    const groups = new Map<string, any>();
+    for (const l of logs) {
+      const k = keyFor(l);
+      let g = groups.get(k);
+      if (!g) {
+        g = { group: k, requests: 0, errors: 0, p50: 0, p95: 0, _durations: [] as number[] };
+        groups.set(k, g);
+      }
+      g.requests += 1;
+      if (l.status >= 400) g.errors += 1;
+      g._durations.push(l.durationMs);
+    }
+    const pct = (a: number[], p: number) => {
+      if (!a.length) return 0;
+      const s = [...a].sort((x, y) => x - y);
+      return s[Math.min(s.length - 1, Math.floor((p / 100) * s.length))];
+    };
+    const rows = [...groups.values()].map((g) => ({
+      group: g.group,
+      requests: g.requests,
+      errors: g.errors,
+      errorRate: g.requests ? this.round((g.errors / g.requests) * 100, 1) : 0,
+      p50Ms: pct(g._durations, 50),
+      p95Ms: pct(g._durations, 95),
+    }));
+    this.sortRows(rows, groupBy);
+
+    return {
+      report: 'audit',
+      groupBy,
+      range: { from: from.toISOString(), to: to.toISOString() },
+      totals: {
+        requests: logs.length,
+        errors: logs.filter((l) => l.status >= 400).length,
+        uniqueActors: new Set(logs.map((l) => l.actorEmail).filter(Boolean)).size,
+      },
+      rows,
+    };
+  }
+
+  // ── Vehicle reporting ─────────────────────────────────────────────
+
+  async vehicles(user: JwtUser, f: ReportFilter) {
+    const { from, to } = this.resolveRange(f);
+    const groupBy = f.groupBy || 'month';
+
+    const where: any = {
+      createdAt: { gte: from, lte: to },
+      vehicleNumber: { not: null },
+      ...visitScope(user),
+    };
+    if (f.branchId) where.branchId = f.branchId;
+
+    const visits = await this.prisma.visit.findMany({
+      where,
+      select: {
+        vehicleNumber: true,
+        createdAt: true,
+        actualEntry: true,
+        actualExit: true,
+        status: true,
+        visitor: { select: { fullName: true, company: true } },
+        branch: { select: { name: true } },
+      },
+    });
+
+    const keyFor = (v: (typeof visits)[number]) => {
+      switch (groupBy) {
+        case 'branch': return v.branch?.name || '—';
+        case 'vehicle': return v.vehicleNumber || '—';
+        case 'company': return v.visitor?.company || '(none)';
+        case 'status': return v.status;
+        default: return this.periodKey(v.createdAt, groupBy as Period);
+      }
+    };
+
+    const groups = new Map<string, any>();
+    for (const v of visits) {
+      const k = keyFor(v);
+      let g = groups.get(k);
+      if (!g) {
+        g = { group: k, vehicles: 0, _plates: new Set<string>(), checkedIn: 0, completed: 0 };
+        groups.set(k, g);
+      }
+      g.vehicles += 1;
+      if (v.vehicleNumber) g._plates.add(v.vehicleNumber);
+      if (v.status === 'CHECKED_IN') g.checkedIn += 1;
+      if (v.status === 'CHECKED_OUT') g.completed += 1;
+    }
+    const rows = [...groups.values()].map((g) => ({
+      group: g.group,
+      vehicles: g.vehicles,
+      uniquePlates: g._plates.size,
+      checkedIn: g.checkedIn,
+      completed: g.completed,
+    }));
+    this.sortRows(rows, groupBy);
+
+    return {
+      report: 'vehicles',
+      groupBy,
+      range: { from: from.toISOString(), to: to.toISOString() },
+      totals: {
+        records: visits.length,
+        uniquePlates: new Set(visits.map((v) => v.vehicleNumber).filter(Boolean)).size,
+      },
+      rows,
+    };
+  }
+
+  // ── Gate activity (composite: visit + attendance) ─────────────────
+
+  async gateActivity(user: JwtUser, f: ReportFilter) {
+    const { from, to } = this.resolveRange(f);
+    const groupBy = f.groupBy || 'day';
+
+    const branchFilter = f.branchId ? { branchId: f.branchId } : {};
+
+    const [visits, attendance] = await Promise.all([
+      this.prisma.visit.findMany({
+        where: {
+          actualEntry: { gte: from, lte: to },
+          ...visitScope(user),
+          ...branchFilter,
+        },
+        select: { actualEntry: true, actualExit: true, branch: { select: { name: true } } },
+      }),
+      this.prisma.attendance.findMany({
+        where: { checkIn: { gte: from, lte: to }, ...attendanceScope(user), ...branchFilter },
+        select: { checkIn: true, checkOut: true, branch: { select: { name: true } } },
+      }),
+    ]);
+
+    type Cell = { visitorEntries: number; visitorExits: number; workerEntries: number; workerExits: number };
+    const groups = new Map<string, Cell>();
+    const ensure = (k: string) => {
+      let g = groups.get(k);
+      if (!g) {
+        g = { visitorEntries: 0, visitorExits: 0, workerEntries: 0, workerExits: 0 };
+        groups.set(k, g);
+      }
+      return g;
+    };
+
+    const branchOrTime = (when: Date, branch: string | undefined) =>
+      groupBy === 'branch' ? branch || '—' :
+      groupBy === 'hour' ? `${String(new Date(when).getUTCHours()).padStart(2, '0')}:00` :
+      this.periodKey(when, (groupBy === 'hour' ? 'day' : groupBy) as Period);
+
+    for (const v of visits) {
+      if (!v.actualEntry) continue;
+      const g = ensure(branchOrTime(v.actualEntry, v.branch?.name));
+      g.visitorEntries += 1;
+      if (v.actualExit) g.visitorExits += 1;
+    }
+    for (const a of attendance) {
+      const g = ensure(branchOrTime(a.checkIn, a.branch?.name));
+      g.workerEntries += 1;
+      if (a.checkOut) g.workerExits += 1;
+    }
+
+    const rows = [...groups.entries()].map(([group, c]) => ({
+      group,
+      visitorEntries: c.visitorEntries,
+      visitorExits: c.visitorExits,
+      workerEntries: c.workerEntries,
+      workerExits: c.workerExits,
+      totalEntries: c.visitorEntries + c.workerEntries,
+    }));
+    this.sortRows(rows, groupBy === 'hour' ? 'day' : groupBy);
+
+    return {
+      report: 'gate-activity',
+      groupBy,
+      range: { from: from.toISOString(), to: to.toISOString() },
+      totals: {
+        visitorEntries: visits.length,
+        workerEntries: attendance.length,
+        totalEntries: visits.length + attendance.length,
+      },
+      rows,
+    };
+  }
+
+  // ── Catalog: drives the left-rail navigation in the web client ────
+
+  catalog() {
+    return {
+      sections: [
+        {
+          key: 'visitor-ops',
+          label: 'Visitor operations',
+          reports: [
+            { key: 'visits', label: 'Visits', description: 'Volume, status mix, unique visitors, dwell time.', icon: 'Users' },
+            { key: 'gate-activity', label: 'Gate activity', description: 'Entries / exits split by visitors and workers.', icon: 'DoorOpen' },
+            { key: 'vehicles', label: 'Vehicles', description: 'Vehicle traffic by plate, branch and company.', icon: 'Car' },
+            { key: 'materials', label: 'Material movement', description: 'Inbound / outbound gate-pass quantities.', icon: 'Package' },
+          ],
+        },
+        {
+          key: 'workforce',
+          label: 'Workforce',
+          reports: [
+            { key: 'workforce', label: 'Workforce hours', description: 'Attendance, hours, overtime, estimated pay.', icon: 'HardHat' },
+            { key: 'contractors', label: 'Contractors', description: 'Per-contractor compliance, hours and pay.', icon: 'Building2' },
+            { key: 'users', label: 'Hosts / users', description: 'Visits hosted per employee with outcomes.', icon: 'UserCog' },
+          ],
+        },
+        {
+          key: 'security',
+          label: 'Security & compliance',
+          reports: [
+            { key: 'incidents', label: 'Incidents', description: 'Security incidents grouped by severity, kind or status.', icon: 'ShieldAlert' },
+            { key: 'audit', label: 'API audit', description: 'API request volume, error rates and latency.', icon: 'ScrollText' },
+          ],
+        },
+        {
+          key: 'org',
+          label: 'Organization',
+          reports: [
+            { key: 'branches', label: 'Branches / locations', description: 'Per-location footfall and worker hours.', icon: 'Building2' },
+          ],
+        },
+      ],
+    };
+  }
+
   /** Render any grouped report to a flat row array (for server-side export/email). */
   async renderRows(user: JwtUser, report: string, f: ReportFilter): Promise<{ title: string; rows: any[] }> {
     let res: any;
@@ -901,10 +1251,28 @@ export class ReportsService {
       case 'branches': res = await this.branches(user, f); break;
       case 'users': res = await this.users(user, f); break;
       case 'materials': res = await this.materials(user, f); break;
+      case 'incidents': res = await this.incidents(user, f); break;
+      case 'audit': res = await this.audit(user, f); break;
+      case 'vehicles': res = await this.vehicles(user, f); break;
+      case 'gate-activity': res = await this.gateActivity(user, f); break;
       default: res = { rows: [] };
     }
-    const title = report.charAt(0).toUpperCase() + report.slice(1);
-    return { title, rows: res.rows ?? [] };
+    const title = report.charAt(0).toUpperCase() + report.slice(1).replace(/-/g, ' ');
+    const rows = res.rows ?? [];
+    return { title, rows: f.columns ? this.projectColumns(rows, f.columns) : rows };
+  }
+
+  /** Trim each row to the user-selected columns (preserves order). */
+  projectColumns(rows: any[], columns: string[]): any[] {
+    if (!columns?.length || !rows.length) return rows;
+    const set = new Set(columns);
+    return rows.map((row) => {
+      const out: Record<string, any> = {};
+      for (const k of Object.keys(row)) {
+        if (set.has(k)) out[k] = row[k];
+      }
+      return out;
+    });
   }
 
   // ── Shared sorting: time buckets ascending, categorical by volume ──

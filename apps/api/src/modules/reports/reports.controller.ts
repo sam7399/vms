@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { ReportsService, ReportFilter } from './reports.service';
+import { ReportTemplatesService, TemplateInput } from './report-templates.service';
 import { ReportScheduleService, ScheduleInput } from './report-schedule.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -16,6 +17,7 @@ export class ReportsController {
   constructor(
     private readonly reports: ReportsService,
     private readonly schedules: ReportScheduleService,
+    private readonly templates: ReportTemplatesService,
   ) {}
 
   private filter(q: Record<string, string | undefined>): ReportFilter {
@@ -25,7 +27,13 @@ export class ReportsController {
       branchId: q.branchId,
       contractorId: q.contractorId,
       groupBy: q.groupBy,
+      columns: q.columns ? q.columns.split(',').map((c) => c.trim()).filter(Boolean) : undefined,
     };
+  }
+
+  @Get('catalog')
+  catalog() {
+    return this.reports.catalog();
   }
 
   @Get('overview')
@@ -61,6 +69,26 @@ export class ReportsController {
   @Get('materials')
   materials(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
     return this.reports.materials(user, this.filter(q));
+  }
+
+  @Get('incidents')
+  incidents(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
+    return this.reports.incidents(user, this.filter(q));
+  }
+
+  @Get('audit')
+  audit(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
+    return this.reports.audit(user, this.filter(q));
+  }
+
+  @Get('vehicles')
+  vehicles(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
+    return this.reports.vehicles(user, this.filter(q));
+  }
+
+  @Get('gate-activity')
+  gateActivity(@CurrentUser() user: JwtUser, @Query() q: Record<string, string>) {
+    return this.reports.gateActivity(user, this.filter(q));
   }
 
   // ── Ad-hoc "email this report now" ────────────────────────────────
@@ -114,6 +142,32 @@ export class ReportsController {
   @Roles(Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.HR_MANAGER, Role.SECURITY_HEAD)
   deleteSchedule(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.schedules.remove(user, id);
+  }
+
+  // ── Saved report templates ────────────────────────────────────────
+  @Get('templates/list')
+  listTemplates(@CurrentUser() user: JwtUser) {
+    return this.templates.list(user);
+  }
+
+  @Post('templates')
+  createTemplate(@CurrentUser() user: JwtUser, @Body() body: TemplateInput) {
+    return this.templates.create(user, body);
+  }
+
+  @Put('templates/:id')
+  updateTemplate(@CurrentUser() user: JwtUser, @Param('id') id: string, @Body() body: Partial<TemplateInput>) {
+    return this.templates.update(user, id, body);
+  }
+
+  @Delete('templates/:id')
+  deleteTemplate(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.templates.remove(user, id);
+  }
+
+  @Post('templates/:id/favorite')
+  favoriteTemplate(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.templates.toggleFavorite(user, id);
   }
 
   @Post('schedules/:id/run')

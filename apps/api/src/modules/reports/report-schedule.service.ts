@@ -6,8 +6,19 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ReportsService, ReportFilter } from './reports.service';
 import { JwtUser, isSuperAdmin, requireOrg } from '../../common/tenant';
 
-const VALID_REPORTS = ['visits', 'workforce', 'contractors', 'branches', 'users', 'materials'];
-const VALID_FREQ = ['daily', 'weekly', 'monthly'];
+const VALID_REPORTS = [
+  'visits',
+  'workforce',
+  'contractors',
+  'branches',
+  'users',
+  'materials',
+  'incidents',
+  'audit',
+  'vehicles',
+  'gate-activity',
+];
+const VALID_FREQ = ['daily', 'weekly', 'monthly', 'quarterly', 'annually'];
 const VALID_PRESETS = ['thisMonth', 'lastMonth', 'last7d', 'last30d', 'last90d', 'ytd'];
 const POLL_MS = 60_000;
 const EMAIL_PREVIEW_ROWS = 40;
@@ -382,8 +393,22 @@ export class ReportScheduleService implements OnModuleInit, OnModuleDestroy {
       if (next <= from) next.setUTCDate(next.getUTCDate() + 7);
       return next;
     }
-    // monthly
     const dom = clampInt(s.dayOfMonth ?? 1, 1, 28);
+    if (freq === 'quarterly') {
+      // Fire on the dom of the first month of the next quarter the calendar
+      // hasn't visited yet (Jan, Apr, Jul, Oct).
+      const month = next.getUTCMonth();
+      const quarterStart = month - (month % 3);
+      next.setUTCMonth(quarterStart, dom);
+      if (next <= from) next.setUTCMonth(next.getUTCMonth() + 3, dom);
+      return next;
+    }
+    if (freq === 'annually') {
+      next.setUTCMonth(0, dom);
+      if (next <= from) next.setUTCFullYear(next.getUTCFullYear() + 1, 0, dom);
+      return next;
+    }
+    // monthly
     next.setUTCDate(dom);
     if (next <= from) next.setUTCMonth(next.getUTCMonth() + 1, dom);
     return next;

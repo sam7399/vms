@@ -21,7 +21,18 @@ interface Schedule {
   nextRunAt: string | null;
 }
 
-const REPORT_OPTS = ['visits', 'workforce', 'contractors', 'branches', 'users', 'materials'];
+const REPORT_OPTS = [
+  'visits',
+  'workforce',
+  'contractors',
+  'branches',
+  'users',
+  'materials',
+  'incidents',
+  'audit',
+  'vehicles',
+  'gate-activity',
+];
 const PRESET_OPTS = [
   { v: 'thisMonth', l: 'This month' },
   { v: 'lastMonth', l: 'Last month' },
@@ -30,7 +41,7 @@ const PRESET_OPTS = [
   { v: 'last90d', l: 'Last 90 days' },
   { v: 'ytd', l: 'This year' },
 ];
-const FREQ_OPTS = ['daily', 'weekly', 'monthly'];
+const FREQ_OPTS = ['daily', 'weekly', 'monthly', 'quarterly', 'annually'];
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const emptyForm = {
@@ -170,7 +181,7 @@ export function SchedulesPanel() {
               </select>
             </Field>
           )}
-          {form.frequency === 'monthly' && (
+          {(form.frequency === 'monthly' || form.frequency === 'quarterly' || form.frequency === 'annually') && (
             <Field label="Day of month (1–28)">
               <input type="number" min={1} max={28} value={form.dayOfMonth} onChange={(e) => set('dayOfMonth', +e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white" />
@@ -210,7 +221,7 @@ export function SchedulesPanel() {
                 <div className="text-xs text-zinc-400 mt-0.5">
                   {s.frequency}
                   {s.frequency === 'weekly' && ` · ${DOW[s.dayOfWeek ?? 1]}`}
-                  {s.frequency === 'monthly' && ` · day ${s.dayOfMonth ?? 1}`}
+                  {(s.frequency === 'monthly' || s.frequency === 'quarterly' || s.frequency === 'annually') && ` · day ${s.dayOfMonth ?? 1}`}
                   {` · ${String(s.hourUtc).padStart(2, '0')}:00 UTC · ${s.rangePreset} → ${s.recipients}`}
                 </div>
                 <div className="text-xs text-zinc-600 mt-0.5">

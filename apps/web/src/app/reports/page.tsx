@@ -1,39 +1,37 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardHeader } from '@/components/dashboard-header';
 import {
-  Download,
-  FileText,
-  FileSpreadsheet,
-  BarChart3,
-  Users,
-  HardHat,
-  Building2,
-  UserCog,
-  Package,
   CalendarRange,
   CalendarClock,
-  RefreshCw,
-  ChevronRight,
   ChevronDown,
+  RefreshCw,
   Mail,
   Send,
   X,
   Loader2,
   Sparkles,
+  TableProperties,
+  BarChart3,
 } from 'lucide-react';
 import { apiGet, apiPost } from '@/lib/api';
 import { downloadCSV } from '@/lib/csv';
 import { downloadPDF } from '@/lib/pdf';
 import { downloadXLSX } from '@/lib/xlsx';
+import { downloadJSON, downloadXML, printReport } from '@/lib/export-formats';
 import { ReportChart, type Series } from '@/components/reports/ReportChart';
 import { SchedulesPanel } from '@/components/reports/SchedulesPanel';
+import { CatalogRail, type CatalogSection } from '@/components/reports/CatalogRail';
+import { DownloadCenter, type ExportFormat, type ExportScope } from '@/components/reports/DownloadCenter';
+import { ColumnSelector } from '@/components/reports/ColumnSelector';
+import { DrillDrawer } from '@/components/reports/DrillDrawer';
+import { TemplatesPanel, type Template } from '@/components/reports/TemplatesPanel';
 
 // ───────────────────────────────────────────────────────────────────
-// Date-range presets
+// Helpers
 // ───────────────────────────────────────────────────────────────────
 function iso(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -55,25 +53,30 @@ function buildPresets() {
     { key: 'ytd', label: 'This year', from: iso(new Date(Date.UTC(now.getUTCFullYear(), 0, 1))), to: iso(now) },
   ];
 }
+function presetByKey(key: string) {
+  return buildPresets().find((p) => p.key === key);
+}
+function humanize(s: string) {
+  return s
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, (c) => c.toUpperCase())
+    .replace(/_/g, ' ')
+    .trim();
+}
 
 // ───────────────────────────────────────────────────────────────────
-// Report catalogue
+// Per-report metadata that's UI-only (endpoint paths, grouping options,
+// chart series). Server-driven catalog provides the *list*, this map
+// adds the rendering details.
 // ───────────────────────────────────────────────────────────────────
 interface GroupOpt { value: string; label: string }
-interface ReportDef {
-  key: string;
-  label: string;
-  description: string;
+interface ReportRender {
   endpoint: string;
-  icon: typeof BarChart3;
-  /** column the grouped rows are keyed by (for chart x-axis + drill-down). */
   labelKey: string;
   groupBy?: GroupOpt[];
-  /** fixed drill-down dimension for reports without a groupBy selector. */
   fixedDetailGroupBy?: string;
   useBranch?: boolean;
   useContractor?: boolean;
-  /** chart series; values may differ per row but keys are stable. */
   series: Series[];
 }
 
@@ -84,17 +87,13 @@ const TIME_GROUPS: GroupOpt[] = [
   { value: 'year', label: 'Yearly' },
 ];
 
-const REPORTS: ReportDef[] = [
-  {
-    key: 'visits',
-    label: 'Visits',
-    description: 'Visit volume, status mix, unique visitors and dwell time.',
+const RENDER: Record<string, ReportRender> = {
+  visits: {
     endpoint: '/reports/visits',
-    icon: Users,
     labelKey: 'group',
     useBranch: true,
     series: [
-      { key: 'total', label: 'Total', color: 'rgba(99,102,241,0.85)' },
+      { key: 'total', label: 'Total', color: 'rgba(124,58,237,0.85)' },
       { key: 'checkedIn', label: 'Checked in', color: '#22c55e' },
       { key: 'rejected', label: 'Rejected', color: '#f43f5e' },
     ],
@@ -107,17 +106,13 @@ const REPORTS: ReportDef[] = [
       { value: 'purpose', label: 'By purpose' },
     ],
   },
-  {
-    key: 'workforce',
-    label: 'Workforce hours',
-    description: 'Attendance, hours, overtime and estimated pay.',
+  workforce: {
     endpoint: '/reports/workforce',
-    icon: HardHat,
     labelKey: 'group',
     useBranch: true,
     useContractor: true,
     series: [
-      { key: 'totalHours', label: 'Total hours', color: 'rgba(99,102,241,0.85)' },
+      { key: 'totalHours', label: 'Total hours', color: 'rgba(124,58,237,0.85)' },
       { key: 'overtimeHours', label: 'Overtime', color: '#f59e0b' },
     ],
     groupBy: [
@@ -128,55 +123,39 @@ const REPORTS: ReportDef[] = [
       { value: 'skill', label: 'By skill category' },
     ],
   },
-  {
-    key: 'contractors',
-    label: 'Contractors',
-    description: 'Per-contractor compliance, headcount, hours and pay.',
+  contractors: {
     endpoint: '/reports/contractors',
-    icon: Building2,
     labelKey: 'contractor',
     fixedDetailGroupBy: 'contractor',
     series: [
-      { key: 'totalWorkers', label: 'Workers', color: 'rgba(99,102,241,0.85)' },
+      { key: 'totalWorkers', label: 'Workers', color: 'rgba(124,58,237,0.85)' },
       { key: 'workersOnSite', label: 'On site', color: '#22c55e' },
       { key: 'complianceScore', label: 'Compliance', color: '#a855f7' },
     ],
   },
-  {
-    key: 'branches',
-    label: 'Branches / locations',
-    description: 'Per-location footfall, occupancy and worker hours.',
+  branches: {
     endpoint: '/reports/branches',
-    icon: Building2,
     labelKey: 'branch',
     fixedDetailGroupBy: 'branch',
     series: [
-      { key: 'visits', label: 'Visits', color: 'rgba(99,102,241,0.85)' },
-      { key: 'uniqueVisitors', label: 'Unique visitors', color: '#22c55e' },
+      { key: 'visits', label: 'Visits', color: 'rgba(124,58,237,0.85)' },
+      { key: 'uniqueVisitors', label: 'Unique', color: '#22c55e' },
       { key: 'workersOnSite', label: 'Workers', color: '#f59e0b' },
     ],
   },
-  {
-    key: 'users',
-    label: 'Hosts / users',
-    description: 'Visits hosted per employee with approval outcomes.',
+  users: {
     endpoint: '/reports/users',
-    icon: UserCog,
     labelKey: 'host',
     fixedDetailGroupBy: 'host',
     useBranch: true,
     series: [
-      { key: 'total', label: 'Hosted', color: 'rgba(99,102,241,0.85)' },
+      { key: 'total', label: 'Hosted', color: 'rgba(124,58,237,0.85)' },
       { key: 'checkedIn', label: 'Checked in', color: '#22c55e' },
       { key: 'rejected', label: 'Rejected', color: '#f43f5e' },
     ],
   },
-  {
-    key: 'materials',
-    label: 'Material movement',
-    description: 'Inbound / outbound gate-pass quantities.',
+  materials: {
     endpoint: '/reports/materials',
-    icon: Package,
     labelKey: 'group',
     useBranch: true,
     series: [
@@ -189,78 +168,170 @@ const REPORTS: ReportDef[] = [
       { value: 'direction', label: 'By direction' },
     ],
   },
-];
+  incidents: {
+    endpoint: '/reports/incidents',
+    labelKey: 'group',
+    useBranch: true,
+    series: [
+      { key: 'total', label: 'Total', color: 'rgba(124,58,237,0.85)' },
+      { key: 'open', label: 'Open', color: '#f43f5e' },
+      { key: 'resolved', label: 'Resolved', color: '#22c55e' },
+    ],
+    groupBy: [
+      ...TIME_GROUPS,
+      { value: 'branch', label: 'By branch / location' },
+      { value: 'kind', label: 'By kind' },
+      { value: 'status', label: 'By status' },
+      { value: 'severity', label: 'By severity' },
+    ],
+  },
+  audit: {
+    endpoint: '/reports/audit',
+    labelKey: 'group',
+    series: [
+      { key: 'requests', label: 'Requests', color: 'rgba(124,58,237,0.85)' },
+      { key: 'errors', label: 'Errors', color: '#f43f5e' },
+    ],
+    groupBy: [
+      ...TIME_GROUPS,
+      { value: 'actor', label: 'By user' },
+      { value: 'role', label: 'By role' },
+      { value: 'path', label: 'By endpoint' },
+      { value: 'method', label: 'By HTTP method' },
+      { value: 'status', label: 'By status class' },
+    ],
+  },
+  vehicles: {
+    endpoint: '/reports/vehicles',
+    labelKey: 'group',
+    useBranch: true,
+    series: [
+      { key: 'vehicles', label: 'Vehicles', color: 'rgba(124,58,237,0.85)' },
+      { key: 'uniquePlates', label: 'Unique plates', color: '#22c55e' },
+    ],
+    groupBy: [
+      ...TIME_GROUPS,
+      { value: 'branch', label: 'By branch / location' },
+      { value: 'vehicle', label: 'By plate' },
+      { value: 'company', label: 'By company' },
+      { value: 'status', label: 'By status' },
+    ],
+  },
+  'gate-activity': {
+    endpoint: '/reports/gate-activity',
+    labelKey: 'group',
+    useBranch: true,
+    series: [
+      { key: 'visitorEntries', label: 'Visitor entries', color: 'rgba(124,58,237,0.85)' },
+      { key: 'workerEntries', label: 'Worker entries', color: '#22c55e' },
+      { key: 'totalEntries', label: 'Total entries', color: '#a855f7' },
+    ],
+    groupBy: [
+      ...TIME_GROUPS,
+      { value: 'hour', label: 'By hour of day' },
+      { value: 'branch', label: 'By branch / location' },
+    ],
+  },
+};
 
 interface Branch { id: string; name: string; location: string }
 interface Contractor { id: string; companyName: string }
 
-function qs(params: Record<string, string | undefined>) {
+function qs(params: Record<string, string | string[] | undefined>) {
   const sp = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) if (v) sp.set(k, v);
+  for (const [k, v] of Object.entries(params)) {
+    if (Array.isArray(v)) {
+      if (v.length) sp.set(k, v.join(','));
+    } else if (v) sp.set(k, v);
+  }
   const s = sp.toString();
   return s ? `?${s}` : '';
 }
 
 type Notice = { kind: 'ok' | 'err'; text: string };
 
+// ───────────────────────────────────────────────────────────────────
+// Page
+// ───────────────────────────────────────────────────────────────────
 export default function ReportsPage() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
 
   const presets = useMemo(buildPresets, []);
+  const [catalog, setCatalog] = useState<CatalogSection[]>([]);
+  const [activeKey, setActiveKey] = useState<string>('visits');
+
+  // Filters
   const [from, setFrom] = useState(presets[0].from);
   const [to, setTo] = useState(presets[0].to);
   const [activePreset, setActivePreset] = useState('thisMonth');
   const [branchId, setBranchId] = useState('');
   const [contractorId, setContractorId] = useState('');
-
   const [branches, setBranches] = useState<Branch[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
 
-  const [activeKey, setActiveKey] = useState<string>('visits');
+  // Per-report group-by + column selection
   const [groupByByReport, setGroupByByReport] = useState<Record<string, string>>({});
+  const [columnsByReport, setColumnsByReport] = useState<Record<string, string[] | null>>({});
   const [view, setView] = useState<'chart' | 'table'>('chart');
+
+  // Data
   const [data, setData] = useState<any | null>(null);
   const [overview, setOverview] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
+  const [downloadBusy, setDownloadBusy] = useState(false);
 
-  // Drill-down state
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [detail, setDetail] = useState<any | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+  // Drill-down drawer
+  const [drillOpen, setDrillOpen] = useState(false);
+  const [drillTitle, setDrillTitle] = useState('');
+  const [drillRows, setDrillRows] = useState<any[]>([]);
+  const [drillCount, setDrillCount] = useState(0);
+  const [drillLoading, setDrillLoading] = useState(false);
 
-  // Email-this-report modal state
-  const [emailFor, setEmailFor] = useState<string | null>(null);
+  // Email modal
+  const [emailOpen, setEmailOpen] = useState(false);
   const [emailRecipients, setEmailRecipients] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBusy, setEmailBusy] = useState(false);
 
-  const activeReport = REPORTS.find((r) => r.key === activeKey)!;
-  const groupBy = groupByByReport[activeKey] ?? activeReport.groupBy?.[0]?.value;
-  const detailGroupBy = activeReport.groupBy ? groupBy : activeReport.fixedDetailGroupBy;
-  const isTimeGroup = ['day', 'week', 'month', 'year'].includes(groupBy ?? '');
+  const render = RENDER[activeKey];
+  const groupBy = groupByByReport[activeKey] ?? render?.groupBy?.[0]?.value;
+  const detailGroupBy = render?.groupBy ? groupBy : render?.fixedDetailGroupBy;
+  const isTimeGroup = ['day', 'week', 'month', 'year', 'hour'].includes(groupBy ?? '');
+  const selectedColumns = columnsByReport[activeKey] ?? null;
 
+  // Lookup: which catalog entry is selected?
+  const allReports = useMemo(
+    () => catalog.flatMap((s) => s.reports),
+    [catalog],
+  );
+  const activeMeta = allReports.find((r) => r.key === activeKey);
+
+  // ── Boot: redirect, fetch catalog + branches + contractors ─────
   useEffect(() => {
     if (!isLoading && !isAuthenticated) router.push('/auth/login');
   }, [isLoading, isAuthenticated, router]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
+    apiGet<{ sections: CatalogSection[] }>('/reports/catalog')
+      .then((c) => setCatalog(c.sections))
+      .catch(() => setCatalog([]));
     apiGet<Branch[]>('/admin/branches').then(setBranches).catch(() => {});
     apiGet<Contractor[]>('/admin/contractors').then(setContractors).catch(() => {});
   }, [isAuthenticated]);
 
+  // ── Data loading ───────────────────────────────────────────────
   const baseParams = useMemo(
     () => ({
       from,
       to,
-      branchId: activeReport.useBranch ? branchId : undefined,
-      contractorId: activeReport.useContractor ? contractorId : undefined,
+      branchId: render?.useBranch ? branchId : undefined,
+      contractorId: render?.useContractor ? contractorId : undefined,
     }),
-    [from, to, branchId, contractorId, activeReport],
+    [from, to, branchId, contractorId, render],
   );
 
   const loadOverview = useCallback(() => {
@@ -270,12 +341,12 @@ export default function ReportsPage() {
   }, [from, to, branchId]);
 
   const loadReport = useCallback(() => {
+    if (!render) return;
     setLoading(true);
     setError(null);
     setData(null);
-    setExpanded(null);
-    setDetail(null);
-    apiGet<any>(`${activeReport.endpoint}${qs({ ...baseParams, groupBy })}`)
+    setDrillOpen(false);
+    apiGet<any>(`${render.endpoint}${qs({ ...baseParams, groupBy })}`)
       .then(setData)
       .catch((e) => {
         setData(null);
@@ -288,7 +359,7 @@ export default function ReportsPage() {
         );
       })
       .finally(() => setLoading(false));
-  }, [activeReport, baseParams, groupBy]);
+  }, [render, baseParams, groupBy]);
 
   useEffect(() => {
     if (isAuthenticated) loadOverview();
@@ -298,127 +369,225 @@ export default function ReportsPage() {
     if (isAuthenticated) loadReport();
   }, [isAuthenticated, loadReport]);
 
+  // ── Filter helpers ─────────────────────────────────────────────
   function applyPreset(p: { key: string; from: string; to: string }) {
     setActivePreset(p.key);
     setFrom(p.from);
     setTo(p.to);
   }
 
-  function toggleRow(value: string) {
-    if (expanded === value) {
-      setExpanded(null);
-      setDetail(null);
-      return;
-    }
-    setExpanded(value);
-    setDetail(null);
-    setDetailLoading(true);
-    apiGet<any>(`${activeReport.endpoint}/detail${qs({ ...baseParams, groupBy: detailGroupBy, value })}`)
-      .then(setDetail)
-      .catch(() => setDetail({ rows: [] }))
-      .finally(() => setDetailLoading(false));
+  // ── Drill-down ─────────────────────────────────────────────────
+  function openDrill(value: string) {
+    if (!render) return;
+    setDrillTitle(value);
+    setDrillRows([]);
+    setDrillCount(0);
+    setDrillLoading(true);
+    setDrillOpen(true);
+    apiGet<any>(
+      `${render.endpoint}/detail${qs({ ...baseParams, groupBy: detailGroupBy, value })}`,
+    )
+      .then((d) => {
+        setDrillRows(d?.rows ?? []);
+        setDrillCount(d?.count ?? d?.rows?.length ?? 0);
+      })
+      .catch(() => setDrillRows([]))
+      .finally(() => setDrillLoading(false));
   }
 
-  const rows: any[] = data?.rows ?? [];
+  // ── Rows with column projection applied client-side too (so the
+  //    visible table matches the export). ────────────────────────
+  const allColumns = data?.rows?.[0] ? Object.keys(data.rows[0]) : [];
+  const effectiveColumns = (() => {
+    if (!allColumns.length) return [];
+    if (!selectedColumns || selectedColumns.length === 0) return allColumns;
+    return allColumns.filter((c) => selectedColumns.includes(c));
+  })();
+  const rows: any[] = (data?.rows ?? []).map((r: any) => {
+    if (!selectedColumns || selectedColumns.length === 0) return r;
+    const out: Record<string, any> = {};
+    for (const c of effectiveColumns) out[c] = r[c];
+    return out;
+  });
 
-  // ── Per-card quick download (independent of the active report) ────
-  async function downloadReport(def: ReportDef, fmt: 'csv' | 'xlsx' | 'pdf') {
-    setDownloadingKey(`${def.key}:${fmt}`);
+  // ── Download Center ───────────────────────────────────────────
+  function appliedFiltersForPdf() {
+    const out: { label: string; value: string }[] = [
+      { label: 'Range', value: `${from} → ${to}` },
+    ];
+    if (groupBy) out.push({ label: 'Group by', value: groupBy });
+    if (branchId) {
+      const b = branches.find((x) => x.id === branchId);
+      out.push({ label: 'Branch', value: b ? `${b.name} — ${b.location}` : branchId });
+    }
+    if (contractorId) {
+      const c = contractors.find((x) => x.id === contractorId);
+      out.push({ label: 'Contractor', value: c?.companyName ?? contractorId });
+    }
+    return out;
+  }
+  function kpisForPdf() {
+    const k = overview?.kpis;
+    if (!k) return [];
+    return [
+      { label: 'Total visits', value: k.totalVisits },
+      { label: 'Unique', value: k.uniqueVisitors },
+      { label: 'Checked in', value: k.checkedInVisits },
+      { label: 'Worker hours', value: k.totalWorkerHours },
+      { label: 'On site', value: k.uniqueWorkersOnSite },
+      { label: 'Contractors', value: k.contractors },
+      { label: 'Avg compliance', value: k.avgComplianceScore != null ? `${k.avgComplianceScore}%` : '—' },
+      { label: 'Rejected', value: k.rejectedVisits },
+    ];
+  }
+
+  async function downloadActive(fmt: ExportFormat, scope: ExportScope, _opts: { withCharts: boolean }) {
+    if (!render || !activeMeta) return;
+    setDownloadBusy(true);
     setNotice(null);
     try {
-      const gb = groupByByReport[def.key] ?? def.groupBy?.[0]?.value;
-      const params = {
-        from,
-        to,
-        branchId: def.useBranch ? branchId : undefined,
-        contractorId: def.useContractor ? contractorId : undefined,
-        groupBy: gb,
-      };
-      const payload = await apiGet<any>(`${def.endpoint}${qs(params)}`);
-      const dRows: any[] = payload?.rows ?? [];
-      if (!dRows.length) {
-        setNotice({ kind: 'err', text: `No data for ${def.label} in the selected filters.` });
-        return;
+      // For "full" scope we re-fetch without the column filter; otherwise
+      // we ship the projected rows the user is looking at.
+      let dataForExport = data;
+      if (scope === 'full' && (selectedColumns?.length ?? 0) > 0) {
+        dataForExport = await apiGet<any>(`${render.endpoint}${qs({ ...baseParams, groupBy })}`);
       }
-      const name = `vms-${def.key}-${gb ?? 'all'}-${from}_${to}`;
-      const title = `${def.label} · ${from} → ${to}`;
-      if (fmt === 'csv') downloadCSV(`${name}.csv`, dRows);
-      else if (fmt === 'pdf') downloadPDF(`${name}.pdf`, title, dRows);
-      else {
-        const totals = payload?.totals
-          ? [Object.fromEntries(Object.entries(payload.totals).map(([k, v]) => [k, v as any]))]
-          : [];
-        downloadXLSX(name, [
-          ...(totals.length ? [{ name: 'Summary', rows: totals }] : []),
-          { name: def.label, rows: dRows },
-        ]);
-      }
-      setNotice({ kind: 'ok', text: `Downloaded ${def.label} (${dRows.length} rows)` });
-    } catch (e) {
-      setNotice({ kind: 'err', text: e instanceof Error ? e.message : 'Download failed' });
-    } finally {
-      setDownloadingKey(null);
-    }
-  }
+      const exportRows: any[] = scope === 'summary'
+        ? []
+        : scope === 'full'
+          ? (dataForExport?.rows ?? [])
+          : rows;
 
-  function exportActive(fmt: 'csv' | 'pdf' | 'xlsx') {
-    if (!rows.length) {
-      setNotice({ kind: 'err', text: 'No data to export for the current filters.' });
-      return;
-    }
-    const name = `vms-${activeKey}-${groupBy ?? 'all'}-${from}_${to}`;
-    const title = `${activeReport.label} · ${from} → ${to}`;
-    if (fmt === 'csv') downloadCSV(`${name}.csv`, rows);
-    else if (fmt === 'pdf') downloadPDF(`${name}.pdf`, title, rows);
-    else {
-      const totals = data?.totals
-        ? [Object.fromEntries(Object.entries(data.totals).map(([k, v]) => [k, v as any]))]
+      const summaryRows = dataForExport?.totals
+        ? [Object.fromEntries(Object.entries(dataForExport.totals).map(([k, v]) => [k, v as any]))]
         : [];
-      downloadXLSX(name, [
-        ...(totals.length ? [{ name: 'Summary', rows: totals }] : []),
-        { name: activeReport.label, rows },
-      ]);
+
+      const safe = `vms-${activeKey}-${groupBy ?? 'all'}-${from}_${to}`;
+      const title = `${activeMeta.label} · ${from} → ${to}`;
+
+      if (fmt === 'csv') {
+        if (scope === 'summary') {
+          if (!summaryRows.length) {
+            setNotice({ kind: 'err', text: 'No summary totals to export.' });
+            return;
+          }
+          downloadCSV(`${safe}-summary.csv`, summaryRows);
+        } else {
+          if (!exportRows.length) {
+            setNotice({ kind: 'err', text: 'No rows in the selected scope.' });
+            return;
+          }
+          downloadCSV(`${safe}.csv`, exportRows);
+        }
+      } else if (fmt === 'xlsx') {
+        const sheets = [
+          ...(summaryRows.length ? [{ name: 'Summary', rows: summaryRows }] : []),
+          ...(scope === 'summary' ? [] : [{ name: activeMeta.label.slice(0, 28), rows: exportRows }]),
+        ];
+        if (!sheets.length) {
+          setNotice({ kind: 'err', text: 'Nothing to export for this scope.' });
+          return;
+        }
+        downloadXLSX(safe, sheets);
+      } else if (fmt === 'pdf') {
+        downloadPDF(`${safe}.pdf`, {
+          title: activeMeta.label,
+          subtitle: `${groupBy ? humanize(groupBy) : 'Report'} · ${from} → ${to}`,
+          filters: appliedFiltersForPdf(),
+          kpis: kpisForPdf(),
+          generatedBy: user?.fullName || user?.email,
+          brand: 'AEGIS',
+        }, scope === 'summary' ? summaryRows : exportRows);
+      } else if (fmt === 'json') {
+        downloadJSON(safe, {
+          title: activeMeta.label,
+          range: { from, to },
+          totals: dataForExport?.totals,
+          rows: scope === 'summary' ? summaryRows : exportRows,
+        });
+      } else if (fmt === 'xml') {
+        downloadXML(safe, {
+          title: activeMeta.label,
+          range: { from, to },
+          totals: dataForExport?.totals,
+          rows: scope === 'summary' ? summaryRows : exportRows,
+        });
+      } else if (fmt === 'print') {
+        printReport(title, scope === 'summary' ? summaryRows : exportRows, {
+          range: { from, to },
+          totals: dataForExport?.totals,
+        });
+      }
+      setNotice({
+        kind: 'ok',
+        text: `${activeMeta.label} exported as ${fmt.toUpperCase()} (${scope})`,
+      });
+    } catch (e) {
+      setNotice({ kind: 'err', text: e instanceof Error ? e.message : 'Export failed' });
+    } finally {
+      setDownloadBusy(false);
     }
   }
 
-  // ── Email-this-report dialog ─────────────────────────────────────
-  function openEmailFor(key: string) {
-    const def = REPORTS.find((r) => r.key === key)!;
-    setEmailFor(key);
-    setEmailRecipients('');
-    setEmailSubject(`${def.label} · ${from} → ${to}`);
-  }
-
+  // ── Email this report ─────────────────────────────────────────
   async function sendEmail() {
-    if (!emailFor) return;
-    const def = REPORTS.find((r) => r.key === emailFor)!;
-    const gb = groupByByReport[emailFor] ?? def.groupBy?.[0]?.value;
+    if (!render || !activeMeta) return;
     setEmailBusy(true);
     setNotice(null);
     try {
       const res = await apiPost<{ status: string; sent: number; failed: number; rows: number }>(
         '/reports/email',
         {
-          report: emailFor,
-          groupBy: gb,
+          report: activeKey,
+          groupBy,
           from,
           to,
-          branchId: def.useBranch ? branchId : undefined,
-          contractorId: def.useContractor ? contractorId : undefined,
+          branchId: render.useBranch ? branchId : undefined,
+          contractorId: render.useContractor ? contractorId : undefined,
           recipients: emailRecipients,
           subject: emailSubject || undefined,
         },
       );
       setNotice({
         kind: res.sent > 0 ? 'ok' : 'err',
-        text: `${def.label}: ${res.status}`,
+        text: `${activeMeta.label}: ${res.status}`,
       });
-      setEmailFor(null);
+      setEmailOpen(false);
     } catch (e) {
       setNotice({ kind: 'err', text: e instanceof Error ? e.message : 'Email failed' });
     } finally {
       setEmailBusy(false);
     }
+  }
+
+  // ── Saved templates ───────────────────────────────────────────
+  function applyTemplate(t: Template) {
+    setActiveKey(t.report);
+    if (t.groupBy) setGroupByByReport((m) => ({ ...m, [t.report]: t.groupBy! }));
+    if (t.branchId !== undefined) setBranchId(t.branchId ?? '');
+    if (t.contractorId !== undefined) setContractorId(t.contractorId ?? '');
+    if (t.rangePreset) {
+      const p = presetByKey(t.rangePreset);
+      if (p) applyPreset(p);
+    }
+    if (t.columns) {
+      const cols = t.columns.split(',').map((c) => c.trim()).filter(Boolean);
+      setColumnsByReport((m) => ({ ...m, [t.report]: cols.length ? cols : null }));
+    } else {
+      setColumnsByReport((m) => ({ ...m, [t.report]: null }));
+    }
+    setNotice({ kind: 'ok', text: `Applied saved view "${t.name}"` });
+  }
+  function buildSnapshot() {
+    return {
+      name: activeMeta?.label ?? 'View',
+      report: activeKey,
+      groupBy: groupBy ?? null,
+      branchId: branchId || null,
+      contractorId: contractorId || null,
+      rangePreset: activePreset === 'custom' ? 'thisMonth' : activePreset,
+      columns: selectedColumns?.length ? selectedColumns.join(',') : null,
+    };
   }
 
   if (isLoading || !isAuthenticated) {
@@ -430,22 +599,22 @@ export default function ReportsPage() {
   }
 
   const kpis = overview?.kpis;
-  const activeDef = REPORTS.find((r) => r.key === emailFor);
 
   return (
     <main className="min-h-screen">
       <DashboardHeader />
 
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        {/* ── Page header ────────────────────────────────────────── */}
+      <div className="max-w-[1480px] mx-auto px-4 sm:px-6 py-8">
+        {/* ── Page header ──────────────────────────────────────── */}
         <div className="mb-6 flex items-end justify-between flex-wrap gap-4">
           <div>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-500/10 border border-brand-500/30 text-brand-300 text-[11px] uppercase tracking-wider font-medium mb-3">
-              <Sparkles className="w-3 h-3" /> Analytics
+              <Sparkles className="w-3 h-3" /> Enterprise reporting
             </div>
-            <h2 className="text-3xl font-bold text-text-primary mb-1">Reports &amp; Insights</h2>
-            <p className="text-text-secondary text-sm">
-              Six reporting families, drill-down to raw records, download in three formats, or email any report directly from here.
+            <h2 className="text-3xl font-bold text-text-primary mb-1">Reporting Center</h2>
+            <p className="text-text-secondary text-sm max-w-2xl">
+              Ten report families, server-side filtering, column-by-column control, drill-downs and a
+              download / email center on every view. Saved views and scheduled delivery on the right.
             </p>
           </div>
           <button
@@ -457,7 +626,6 @@ export default function ReportsPage() {
           </button>
         </div>
 
-        {/* Toast strip */}
         {notice && (
           <div
             className={`mb-4 px-4 py-2.5 rounded-lg text-sm flex items-center justify-between gap-3 ${
@@ -473,371 +641,273 @@ export default function ReportsPage() {
           </div>
         )}
 
-        {/* ── Filter bar ─────────────────────────────────────────── */}
-        <div className="mb-6 rounded-2xl border border-border-subtle bg-surface-1 p-4 space-y-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <CalendarRange className="w-4 h-4 text-brand-400" />
-            {presets.map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => applyPreset(p)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  activePreset === p.key
-                    ? 'bg-brand-gradient text-white shadow-brand-glow'
-                    : 'bg-surface-2 text-text-secondary hover:bg-surface-3 hover:text-text-primary border border-border-subtle'
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-end gap-4 flex-wrap">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-text-tertiary">From</span>
-              <input type="date" value={from}
-                onChange={(e) => { setFrom(e.target.value); setActivePreset('custom'); }}
-                className="bg-surface-2 border border-border-subtle rounded-lg px-3 py-1.5 text-sm text-text-primary" />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-text-tertiary">To</span>
-              <input type="date" value={to}
-                onChange={(e) => { setTo(e.target.value); setActivePreset('custom'); }}
-                className="bg-surface-2 border border-border-subtle rounded-lg px-3 py-1.5 text-sm text-text-primary" />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-text-tertiary">Branch / location</span>
-              <select value={branchId} onChange={(e) => setBranchId(e.target.value)}
-                className="bg-surface-2 border border-border-subtle rounded-lg px-3 py-1.5 text-sm text-text-primary">
-                <option value="">All branches</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name} — {b.location}</option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-text-tertiary">Contractor</span>
-              <select value={contractorId} onChange={(e) => setContractorId(e.target.value)}
-                className="bg-surface-2 border border-border-subtle rounded-lg px-3 py-1.5 text-sm text-text-primary">
-                <option value="">All contractors</option>
-                {contractors.map((c) => (
-                  <option key={c.id} value={c.id}>{c.companyName}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </div>
-
-        {/* ── KPI strip ──────────────────────────────────────────── */}
+        {/* ── KPI strip (always visible) ───────────────────────── */}
         {kpis && (
-          <div className="mb-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="mb-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <Kpi label="Total visits" value={kpis.totalVisits} />
-            <Kpi label="Unique visitors" value={kpis.uniqueVisitors} />
+            <Kpi label="Unique" value={kpis.uniqueVisitors} />
             <Kpi label="Checked in" value={kpis.checkedInVisits} />
-            <Kpi label="Avg dwell (min)" value={kpis.avgVisitDurationMin ?? '—'} />
+            <Kpi label="Avg dwell" value={kpis.avgVisitDurationMin != null ? `${kpis.avgVisitDurationMin}m` : '—'} />
             <Kpi label="Worker hours" value={kpis.totalWorkerHours} />
             <Kpi label="Workers on site" value={kpis.uniqueWorkersOnSite} />
             <Kpi label="Active workers" value={kpis.activeWorkers} />
             <Kpi label="Contractors" value={kpis.contractors} />
             <Kpi label="Avg compliance" value={kpis.avgComplianceScore != null ? `${kpis.avgComplianceScore}%` : '—'} />
-            <Kpi label="Completed visits" value={kpis.completedVisits} />
+            <Kpi label="Completed" value={kpis.completedVisits} />
             <Kpi label="Rejected" value={kpis.rejectedVisits} />
             <Kpi label="Headcount" value={kpis.totalHeadcount} />
           </div>
         )}
 
-        {/* ── Report card grid ───────────────────────────────────── */}
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-xs uppercase tracking-wider text-text-tertiary font-semibold">
-            Pick a report — or grab a download right from the card
-          </h3>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {REPORTS.map((r) => {
-            const Icon = r.icon;
-            const isActive = activeKey === r.key;
-            const busy = downloadingKey?.startsWith(`${r.key}:`);
-            return (
-              <div
-                key={r.key}
-                className={`relative rounded-2xl p-5 border transition-all ${
-                  isActive
-                    ? 'border-brand-400/60 bg-brand-500/[0.06] ring-2 ring-brand-500/30 shadow-brand-glow'
-                    : 'border-border-subtle bg-surface-1 hover:border-border-strong hover:bg-surface-2'
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => setActiveKey(r.key)}
-                  className="text-left w-full"
-                  data-tab={r.key}
-                  data-active={isActive}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center bg-brand-gradient text-white shadow-brand-glow">
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="font-semibold text-text-primary truncate">{r.label}</h4>
-                      <p className="text-xs text-text-secondary mt-1 leading-snug line-clamp-2">
-                        {r.description}
-                      </p>
-                    </div>
-                    <ChevronRight
-                      className={`w-4 h-4 mt-1 text-text-tertiary transition-transform ${
-                        isActive ? 'rotate-90 text-brand-400' : ''
-                      }`}
-                    />
-                  </div>
-                </button>
+        {/* ── 3-column workspace ───────────────────────────────── */}
+        <div className="flex gap-6 items-start flex-col lg:flex-row">
+          {/* Left rail */}
+          <CatalogRail sections={catalog} activeKey={activeKey} onSelect={setActiveKey} />
 
-                <div className="mt-4 pt-3 border-t border-border-subtle flex items-center gap-1.5 flex-wrap">
-                  <QuickAction
-                    icon={FileSpreadsheet}
-                    label="Excel"
-                    busy={downloadingKey === `${r.key}:xlsx`}
-                    onClick={() => downloadReport(r, 'xlsx')}
-                  />
-                  <QuickAction
-                    icon={Download}
-                    label="CSV"
-                    busy={downloadingKey === `${r.key}:csv`}
-                    onClick={() => downloadReport(r, 'csv')}
-                  />
-                  <QuickAction
-                    icon={FileText}
-                    label="PDF"
-                    busy={downloadingKey === `${r.key}:pdf`}
-                    onClick={() => downloadReport(r, 'pdf')}
-                  />
-                  <span className="flex-1" />
-                  <QuickAction
-                    icon={Mail}
-                    label="Email"
-                    accent
-                    onClick={() => openEmailFor(r.key)}
-                  />
-                </div>
-
-                {busy && (
-                  <div className="absolute inset-0 rounded-2xl flex items-center justify-center bg-surface-1/70 backdrop-blur-sm">
-                    <Loader2 className="w-5 h-5 text-brand-400 animate-spin" />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* ── Active report detail panel ─────────────────────────── */}
-        <div className="mt-8 rounded-2xl border border-border-subtle bg-surface-1 overflow-hidden">
-          <div className="flex items-center justify-between gap-4 p-5 flex-wrap border-b border-border-subtle">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center bg-brand-gradient text-white">
-                <activeReport.icon className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-lg font-semibold text-text-primary">{activeReport.label}</h3>
-                <p className="text-sm text-text-secondary truncate">{activeReport.description}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {activeReport.groupBy && (
-                <select
-                  value={groupBy}
-                  onChange={(e) =>
-                    setGroupByByReport((m) => ({ ...m, [activeKey]: e.target.value }))
-                  }
-                  className="bg-surface-2 border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary"
-                >
-                  {activeReport.groupBy.map((g) => (
-                    <option key={g.value} value={g.value}>{g.label}</option>
-                  ))}
-                </select>
-              )}
-              <div className="flex rounded-lg bg-surface-2 border border-border-subtle p-1">
-                {(['chart', 'table'] as const).map((v) => (
+          {/* Center workspace */}
+          <section className="flex-1 min-w-0 space-y-4 w-full">
+            {/* Filters bar */}
+            <div className="rounded-2xl border border-border-subtle bg-surface-1 p-4 space-y-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <CalendarRange className="w-4 h-4 text-brand-400" />
+                {presets.map((p) => (
                   <button
-                    key={v}
+                    key={p.key}
                     type="button"
-                    onClick={() => setView(v)}
-                    className={`px-3 py-1 text-xs rounded capitalize transition-colors ${
-                      view === v
-                        ? 'bg-brand-gradient text-white'
-                        : 'text-text-tertiary hover:text-text-primary'
+                    onClick={() => applyPreset(p)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      activePreset === p.key
+                        ? 'bg-brand-gradient text-white shadow-brand-glow'
+                        : 'bg-surface-2 text-text-secondary hover:bg-surface-3 hover:text-text-primary border border-border-subtle'
                     }`}
                   >
-                    {v}
+                    {p.label}
                   </button>
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={() => openEmailFor(activeKey)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border-subtle text-text-secondary hover:text-text-primary text-sm font-medium transition-colors"
-                title="Email this report now"
-              >
-                <Mail className="w-4 h-4" /> Email
-              </button>
-              <button
-                type="button"
-                onClick={() => exportActive('csv')}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
-              >
-                <Download className="w-4 h-4" /> CSV
-              </button>
-              <button
-                type="button"
-                onClick={() => exportActive('xlsx')}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"
-              >
-                <FileSpreadsheet className="w-4 h-4" /> Excel
-              </button>
-              <button
-                type="button"
-                onClick={() => exportActive('pdf')}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium"
-              >
-                <FileText className="w-4 h-4" /> PDF
-              </button>
-            </div>
-          </div>
 
-          {data?.totals && (
-            <div className="flex flex-wrap gap-2 px-5 py-3 border-b border-border-subtle bg-surface-2/50">
-              {Object.entries(data.totals).map(([k, v]) => (
-                <span
-                  key={k}
-                  className="text-xs px-2.5 py-1 rounded-md bg-surface-1 border border-border-subtle text-text-secondary"
-                >
-                  <span className="text-text-tertiary">{humanize(k)}:</span>{' '}
-                  <span className="text-text-primary font-medium">{String(v)}</span>
-                </span>
-              ))}
-            </div>
-          )}
-
-          {error && (
-            <div className="p-4 text-sm text-red-300 bg-red-500/10 border-b border-red-500/30">{error}</div>
-          )}
-
-          {loading ? (
-            <div className="p-12 text-center text-text-tertiary">Loading report…</div>
-          ) : rows.length === 0 ? (
-            <div className="p-12 text-center text-text-tertiary">No data for the selected filters.</div>
-          ) : view === 'chart' ? (
-            <div className="p-5">
-              <ReportChart
-                rows={rows}
-                labelKey={activeReport.labelKey}
-                series={activeReport.series}
-                type={isTimeGroup ? 'line' : 'bar'}
-              />
-              <p className="text-xs text-text-tertiary mt-3">Switch to Table to drill into the records behind each bar.</p>
-            </div>
-          ) : (
-            <div className="overflow-auto max-h-[40rem]">
-              <table className="w-full text-sm">
-                <thead className="text-text-tertiary sticky top-0 bg-surface-2/95 backdrop-blur">
-                  <tr>
-                    <th className="w-8" />
-                    {Object.keys(rows[0]).map((h) => (
-                      <th key={h} className="text-left px-4 py-2.5 font-medium whitespace-nowrap">{humanize(h)}</th>
+              <div className="flex items-end gap-3 flex-wrap">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-text-tertiary">From</span>
+                  <input type="date" value={from}
+                    onChange={(e) => { setFrom(e.target.value); setActivePreset('custom'); }}
+                    className="bg-surface-2 border border-border-subtle rounded-lg px-3 py-1.5 text-sm text-text-primary" />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-text-tertiary">To</span>
+                  <input type="date" value={to}
+                    onChange={(e) => { setTo(e.target.value); setActivePreset('custom'); }}
+                    className="bg-surface-2 border border-border-subtle rounded-lg px-3 py-1.5 text-sm text-text-primary" />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-text-tertiary">Branch / location</span>
+                  <select value={branchId} onChange={(e) => setBranchId(e.target.value)}
+                    disabled={!render?.useBranch}
+                    className="bg-surface-2 border border-border-subtle rounded-lg px-3 py-1.5 text-sm text-text-primary disabled:opacity-40">
+                    <option value="">All branches</option>
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name} — {b.location}</option>
                     ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-subtle text-text-secondary">
-                  {rows.map((row, i) => {
-                    const val = String(row[activeReport.labelKey]);
-                    const isOpen = expanded === val;
-                    return (
-                      <Fragment key={i}>
-                        <tr onClick={() => toggleRow(val)} className="hover:bg-surface-2 cursor-pointer">
-                          <td className="pl-3 text-text-tertiary">
-                            {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                          </td>
-                          {Object.keys(rows[0]).map((h) => (
-                            <td key={h} className="px-4 py-2 whitespace-nowrap">
-                              {row[h] === null || row[h] === undefined ? '—' : String(row[h])}
-                            </td>
-                          ))}
-                        </tr>
-                        {isOpen && (
-                          <tr>
-                            <td colSpan={Object.keys(rows[0]).length + 1} className="bg-surface-2/60 px-4 py-3">
-                              {detailLoading ? (
-                                <div className="text-text-tertiary text-xs py-3">Loading records…</div>
-                              ) : !detail?.rows?.length ? (
-                                <div className="text-text-tertiary text-xs py-3">No underlying records.</div>
-                              ) : (
-                                <div className="overflow-auto max-h-72 rounded-lg border border-border-subtle">
-                                  <table className="w-full text-xs">
-                                    <thead className="text-text-tertiary sticky top-0 bg-surface-2/95">
-                                      <tr>
-                                        {Object.keys(detail.rows[0]).map((h) => (
-                                          <th key={h} className="text-left px-3 py-2 font-medium whitespace-nowrap">{humanize(h)}</th>
-                                        ))}
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border-subtle text-text-secondary">
-                                      {detail.rows.map((dr: any, di: number) => (
-                                        <tr key={di}>
-                                          {Object.keys(detail.rows[0]).map((h) => (
-                                            <td key={h} className="px-3 py-1.5 whitespace-nowrap">
-                                              {dr[h] === null || dr[h] === undefined ? '—' : String(dr[h])}
-                                            </td>
-                                          ))}
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                  {detail.count >= 500 && (
-                                    <p className="text-[11px] text-text-tertiary p-2 text-center">Showing first 500 records — narrow the date range to see more.</p>
-                                  )}
-                                </div>
-                              )}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-text-tertiary">Contractor</span>
+                  <select value={contractorId} onChange={(e) => setContractorId(e.target.value)}
+                    disabled={!render?.useContractor}
+                    className="bg-surface-2 border border-border-subtle rounded-lg px-3 py-1.5 text-sm text-text-primary disabled:opacity-40">
+                    <option value="">All contractors</option>
+                    {contractors.map((c) => (
+                      <option key={c.id} value={c.id}>{c.companyName}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            {/* Active report panel */}
+            <div className="rounded-2xl border border-border-subtle bg-surface-1 overflow-hidden">
+              <div className="flex items-center justify-between gap-3 p-5 flex-wrap border-b border-border-subtle">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center bg-brand-gradient text-white">
+                    <BarChart3 className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-semibold text-text-primary truncate">
+                      {activeMeta?.label ?? 'Select a report'}
+                    </h3>
+                    <p className="text-sm text-text-secondary truncate">
+                      {activeMeta?.description ?? ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {render?.groupBy && (
+                    <select
+                      value={groupBy}
+                      onChange={(e) =>
+                        setGroupByByReport((m) => ({ ...m, [activeKey]: e.target.value }))
+                      }
+                      className="bg-surface-2 border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary"
+                    >
+                      {render.groupBy.map((g) => (
+                        <option key={g.value} value={g.value}>{g.label}</option>
+                      ))}
+                    </select>
+                  )}
+                  <ColumnSelector
+                    available={allColumns}
+                    selected={selectedColumns}
+                    onChange={(next) =>
+                      setColumnsByReport((m) => ({ ...m, [activeKey]: next }))
+                    }
+                  />
+                  <div className="flex rounded-lg bg-surface-2 border border-border-subtle p-1">
+                    {(['chart', 'table'] as const).map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setView(v)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors ${
+                          view === v
+                            ? 'bg-brand-gradient text-white'
+                            : 'text-text-tertiary hover:text-text-primary'
+                        }`}
+                      >
+                        {v === 'chart' ? <BarChart3 className="w-3.5 h-3.5" /> : <TableProperties className="w-3.5 h-3.5" />}
+                        <span className="capitalize">{v}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmailRecipients('');
+                      setEmailSubject(`${activeMeta?.label ?? 'Report'} · ${from} → ${to}`);
+                      setEmailOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border-subtle text-text-secondary hover:text-text-primary text-sm font-medium transition-colors"
+                    title="Email this report"
+                  >
+                    <Mail className="w-4 h-4" /> Email
+                  </button>
+                  <DownloadCenter busy={downloadBusy} onExport={downloadActive} />
+                </div>
+              </div>
+
+              {data?.totals && (
+                <div className="flex flex-wrap gap-2 px-5 py-3 border-b border-border-subtle bg-surface-2/50">
+                  {Object.entries(data.totals).map(([k, v]) => (
+                    <span
+                      key={k}
+                      className="text-xs px-2.5 py-1 rounded-md bg-surface-1 border border-border-subtle text-text-secondary"
+                    >
+                      <span className="text-text-tertiary">{humanize(k)}:</span>{' '}
+                      <span className="text-text-primary font-medium">{String(v)}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {error && (
+                <div className="p-4 text-sm text-red-300 bg-red-500/10 border-b border-red-500/30">{error}</div>
+              )}
+
+              {loading ? (
+                <div className="p-16 text-center text-text-tertiary">Loading report…</div>
+              ) : rows.length === 0 ? (
+                <div className="p-16 text-center text-text-tertiary">No data for the selected filters.</div>
+              ) : view === 'chart' ? (
+                <div className="p-5">
+                  <ReportChart
+                    rows={rows}
+                    labelKey={render!.labelKey}
+                    series={render!.series.filter((s) =>
+                      !selectedColumns?.length || effectiveColumns.includes(s.key),
+                    )}
+                    type={isTimeGroup ? 'line' : 'bar'}
+                  />
+                  <p className="text-xs text-text-tertiary mt-3">
+                    Switch to Table to drill into the records behind each bar — every row opens a side panel with all underlying records.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-auto max-h-[40rem]">
+                  <table className="w-full text-sm">
+                    <thead className="text-text-tertiary sticky top-0 bg-surface-2/95 backdrop-blur">
+                      <tr>
+                        {effectiveColumns.map((h) => (
+                          <th key={h} className="text-left px-4 py-2.5 font-medium whitespace-nowrap">{humanize(h)}</th>
+                        ))}
+                        <th className="w-8" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-subtle text-text-secondary">
+                      {rows.map((row: any, i: number) => {
+                        const val = String(row[render!.labelKey]);
+                        return (
+                          <tr
+                            key={i}
+                            onClick={() => openDrill(val)}
+                            className="hover:bg-surface-2 cursor-pointer"
+                          >
+                            {effectiveColumns.map((h) => (
+                              <td key={h} className="px-4 py-2 whitespace-nowrap">
+                                {row[h] === null || row[h] === undefined ? '—' : String(row[h])}
+                              </td>
+                            ))}
+                            <td className="pr-3 text-text-tertiary text-right">
+                              <ChevronDown className="w-4 h-4 -rotate-90 inline-block" />
                             </td>
                           </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          )}
+
+            <p className="text-xs text-text-tertiary">
+              All figures respect your organization scope. Workforce hours assume an 8h/day overtime threshold at 1.5× the worker&apos;s hourly rate.
+            </p>
+          </section>
+
+          {/* Right rail */}
+          <aside className="w-full lg:w-72 shrink-0 space-y-4">
+            <TemplatesPanel onApply={applyTemplate} buildSnapshot={buildSnapshot} />
+
+            <details className="group rounded-2xl border border-border-subtle bg-surface-1 overflow-hidden">
+              <summary className="cursor-pointer list-none flex items-center justify-between gap-3 p-4 hover:bg-surface-2">
+                <div className="flex items-center gap-2">
+                  <CalendarClock className="w-4 h-4 text-brand-400" />
+                  <span className="text-sm font-semibold text-text-primary">Scheduled reports</span>
+                </div>
+                <ChevronDown className="w-4 h-4 text-text-tertiary transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="border-t border-border-subtle">
+                <SchedulesPanel />
+              </div>
+            </details>
+          </aside>
         </div>
-
-        {/* ── Scheduled email reports — collapsed disclosure ─────── */}
-        <details className="mt-8 group rounded-2xl border border-border-subtle bg-surface-1">
-          <summary className="cursor-pointer list-none flex items-center justify-between gap-3 p-4 hover:bg-surface-2 rounded-2xl">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-surface-2 border border-border-subtle">
-                <CalendarClock className="w-4 h-4 text-brand-400" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-text-primary">Scheduled email reports</div>
-                <div className="text-xs text-text-tertiary">Auto-deliver any report on a daily, weekly or monthly cadence.</div>
-              </div>
-            </div>
-            <ChevronDown className="w-4 h-4 text-text-tertiary transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="-mt-2">
-            <SchedulesPanel />
-          </div>
-        </details>
-
-        <p className="text-xs text-text-tertiary mt-6">
-          All figures respect your organization scope. Hours use an 8h/day overtime threshold at 1.5× the worker&apos;s hourly rate.
-        </p>
       </div>
 
-      {/* ── Email modal ──────────────────────────────────────────── */}
-      {emailFor && activeDef && (
+      {/* Drill-down side drawer */}
+      <DrillDrawer
+        open={drillOpen}
+        title={drillTitle}
+        subtitle={`${activeMeta?.label ?? ''} · ${from} → ${to}`}
+        loading={drillLoading}
+        rows={drillRows}
+        count={drillCount}
+        onClose={() => setDrillOpen(false)}
+      />
+
+      {/* Email modal */}
+      {emailOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur"
-          onClick={(e) => { if (e.target === e.currentTarget) setEmailFor(null); }}
+          onClick={(e) => { if (e.target === e.currentTarget) setEmailOpen(false); }}
         >
           <div className="w-full max-w-md rounded-2xl border border-border-subtle bg-surface-1 shadow-2xl">
             <div className="flex items-start justify-between gap-4 p-5 border-b border-border-subtle">
@@ -848,11 +918,11 @@ export default function ReportsPage() {
                 <div>
                   <h3 className="font-semibold text-text-primary">Email this report</h3>
                   <p className="text-xs text-text-tertiary">
-                    {activeDef.label} · {from} → {to} — sent as CSV + Excel attachments
+                    {activeMeta?.label} · {from} → {to} — CSV + Excel attached
                   </p>
                 </div>
               </div>
-              <button type="button" onClick={() => setEmailFor(null)} className="text-text-tertiary hover:text-text-primary">
+              <button type="button" onClick={() => setEmailOpen(false)} className="text-text-tertiary hover:text-text-primary">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -876,7 +946,7 @@ export default function ReportsPage() {
                   type="text"
                   value={emailSubject}
                   onChange={(e) => setEmailSubject(e.target.value)}
-                  placeholder={`${activeDef.label} report`}
+                  placeholder={`${activeMeta?.label} report`}
                   className="bg-surface-2 border border-border-subtle rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500/60"
                 />
               </label>
@@ -885,7 +955,7 @@ export default function ReportsPage() {
             <div className="flex items-center justify-end gap-2 p-4 border-t border-border-subtle bg-surface-2/40 rounded-b-2xl">
               <button
                 type="button"
-                onClick={() => setEmailFor(null)}
+                onClick={() => setEmailOpen(false)}
                 className="px-4 py-2 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border-subtle text-text-secondary text-sm"
               >
                 Cancel
@@ -914,46 +984,4 @@ function Kpi({ label, value }: { label: string; value: string | number }) {
       <div className="text-xs text-text-tertiary mt-0.5">{label}</div>
     </div>
   );
-}
-
-function QuickAction({
-  icon: Icon,
-  label,
-  onClick,
-  busy,
-  accent,
-}: {
-  icon: any;
-  label: string;
-  onClick: () => void;
-  busy?: boolean;
-  accent?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        if (!busy) onClick();
-      }}
-      title={label}
-      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 ${
-        accent
-          ? 'bg-brand-500/15 hover:bg-brand-500/25 text-brand-300 border border-brand-500/30'
-          : 'bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text-primary border border-border-subtle'
-      }`}
-      disabled={busy}
-    >
-      {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Icon className="w-3.5 h-3.5" />}
-      <span>{label}</span>
-    </button>
-  );
-}
-
-function humanize(s: string) {
-  return s
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, (c) => c.toUpperCase())
-    .replace(/_/g, ' ')
-    .trim();
 }
