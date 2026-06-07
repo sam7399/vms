@@ -155,6 +155,95 @@ export class ReportScheduleService implements OnModuleInit, OnModuleDestroy {
     return result;
   }
 
+  /**
+   * Ad-hoc "email this report now" — renders the chosen report with the
+   * supplied filters and emails it as CSV + XLSX attachments. No DB schedule
+   * is created. Used by the "Email this report" button in /reports.
+   */
+  async emailAdHoc(
+    user: JwtUser,
+    payload: {
+      report: string;
+      groupBy?: string;
+      from?: string;
+      to?: string;
+      branchId?: string;
+      contractorId?: string;
+      recipients: string;
+      subject?: string;
+    },
+  ): Promise<{ status: string; rows: number; sent: number; failed: number }> {
+    if (!VALID_REPORTS.includes(payload.report)) {
+      throw new BadRequestException('invalid report');
+    }
+    const recipients = (payload.recipients || '')
+      .split(',')
+      .map((r) => r.trim())
+      .filter(Boolean);
+    if (recipients.length === 0) {
+      throw new BadRequestException('at least one recipient email is required');
+    }
+    for (const e of recipients) {
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) {
+        throw new BadRequestException(`invalid email: ${e}`);
+      }
+    }
+
+    const filter: ReportFilter = {
+      from: payload.from,
+      to: payload.to,
+      branchId: payload.branchId,
+      contractorId: payload.contractorId,
+      groupBy: payload.groupBy,
+    };
+    const { title, rows } = await this.reports.renderRows(user, payload.report, filter);
+    const range = { from: payload.from || '—', to: payload.to || '—' };
+
+    const csv = toCsv(rows);
+    const name = payload.subject?.trim() || `${title} report`;
+    const html = this.emailHtml(name, title, range, rows);
+    const base = `${payload.report}-${range.from}_${range.to}`;
+    const attachments = [
+      {
+        filename: `${base}.xlsx`,
+        content: buildXlsxBase64(
+          title,
+          {
+            name,
+            report: payload.report,
+            groupBy: payload.groupBy ?? null,
+            rangePreset: 'adhoc',
+            frequency: 'adhoc',
+          },
+          range,
+          rows,
+        ),
+      },
+      { filename: `${base}.csv`, content: Buffer.from(csv, 'utf8').toString('base64') },
+    ];
+
+    let sent = 0;
+    let failed = 0;
+    let lastReason = '';
+    for (const to of recipients) {
+      const res = await this.notifications.send({
+        to,
+        subject: `[VMS Report] ${name} · ${range.from} → ${range.to}`,
+        html,
+        attachments,
+      });
+      if (res.sent) sent++;
+      else {
+        failed++;
+        lastReason = res.reason ?? 'unknown';
+      }
+    }
+    const status = sent > 0
+      ? `sent to ${sent}/${recipients.length} (${rows.length} rows)`
+      : `not sent: ${lastReason || 'unknown'}`;
+    return { status, rows: rows.length, sent, failed };
+  }
+
   // ── Scheduler loop ────────────────────────────────────────────────
 
   /**

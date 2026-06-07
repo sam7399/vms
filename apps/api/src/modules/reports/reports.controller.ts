@@ -63,6 +63,25 @@ export class ReportsController {
     return this.reports.materials(user, this.filter(q));
   }
 
+  // ── Ad-hoc "email this report now" ────────────────────────────────
+  @Post('email')
+  emailReport(
+    @CurrentUser() user: JwtUser,
+    @Body()
+    body: {
+      report: string;
+      groupBy?: string;
+      from?: string;
+      to?: string;
+      branchId?: string;
+      contractorId?: string;
+      recipients: string;
+      subject?: string;
+    },
+  ) {
+    return this.schedules.emailAdHoc(user, body);
+  }
+
   // ── Drill-down: raw records behind a grouped row ──────────────────
   @Get(':report/detail')
   detail(
