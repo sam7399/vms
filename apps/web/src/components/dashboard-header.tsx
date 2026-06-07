@@ -6,6 +6,7 @@ import { LogOut, User, Globe } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { NavMenu } from '@/components/nav-menu';
 import { Logo } from '@/components/logo';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 export function DashboardHeader() {
   const { user, logout } = useAuth();
@@ -26,38 +27,41 @@ export function DashboardHeader() {
           <Logo />
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08]">
-              <Globe className="w-3.5 h-3.5 text-zinc-500" />
+            <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-surface-2 border border-border-subtle">
+              <Globe className="w-3.5 h-3.5 text-text-tertiary" />
               <button
                 onClick={() => setLang('en')}
-                className={`px-2 text-xs font-medium ${
-                  lang === 'en' ? 'text-brand-400' : 'text-zinc-500 hover:text-white'
+                className={`px-2 text-xs font-medium transition-colors ${
+                  lang === 'en' ? 'text-brand-400' : 'text-text-tertiary hover:text-text-primary'
                 }`}
                 title="English"
               >
                 EN
               </button>
-              <span className="text-zinc-700">·</span>
+              <span className="text-text-disabled">·</span>
               <button
                 onClick={() => setLang('hi')}
-                className={`px-2 text-xs font-medium ${
-                  lang === 'hi' ? 'text-brand-400' : 'text-zinc-500 hover:text-white'
+                className={`px-2 text-xs font-medium transition-colors ${
+                  lang === 'hi' ? 'text-brand-400' : 'text-text-tertiary hover:text-text-primary'
                 }`}
                 title="हिन्दी"
               >
                 हि
               </button>
             </div>
+
+            <ThemeToggle />
+
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-white leading-tight">{user.fullName}</p>
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wider">{user.role}</p>
+              <p className="text-sm font-medium text-text-primary leading-tight">{user.fullName}</p>
+              <p className="text-[10px] text-text-tertiary uppercase tracking-wider">{user.role}</p>
             </div>
             <div className="w-9 h-9 rounded-full bg-brand-gradient flex items-center justify-center shadow-brand-glow">
               <User className="w-4 h-4 text-white" />
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-red-500/15 hover:text-red-300 text-zinc-400 transition-colors text-sm font-medium"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-2 hover:bg-danger/15 hover:text-danger text-text-secondary transition-colors text-sm font-medium"
               title={t('nav.logout')}
             >
               <LogOut className="w-4 h-4" />

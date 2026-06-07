@@ -89,11 +89,11 @@ export function NavMenu() {
   return (
     <nav
       ref={rootRef}
-      className="flex items-center gap-1 -mx-6 px-6 mt-3 pt-3 border-t border-white/[0.06] flex-wrap relative"
+      className="flex items-center gap-1 -mx-6 px-6 mt-3 pt-3 border-t border-border-subtle flex-wrap relative"
     >
       <Link
         href="/"
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-300 hover:text-white hover:bg-white/[0.06]"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-2"
       >
         <LayoutDashboard className="w-4 h-4 text-brand-400" /> {t('nav.dashboard')}
       </Link>
@@ -111,8 +111,8 @@ export function NavMenu() {
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 isOpen
-                  ? 'bg-brand-500/15 text-white ring-1 ring-brand-500/30'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+                  ? 'bg-brand-500/15 text-text-primary ring-1 ring-brand-500/30'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-2'
               }`}
             >
               <Icon className="w-4 h-4 text-brand-400" />
@@ -146,13 +146,13 @@ export function NavMenu() {
 
       <Link
         href="/help"
-        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/[0.06]"
+        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-2"
       >
         <BookOpen className="w-4 h-4" /> {t('nav.help')}
       </Link>
       <Link
         href="/settings"
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/[0.06]"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-2"
       >
         <SettingsIcon className="w-4 h-4" /> {t('nav.settings')}
       </Link>

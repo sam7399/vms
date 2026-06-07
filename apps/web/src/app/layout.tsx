@@ -7,6 +7,7 @@ import { BrandFooter } from "@/components/brand-footer";
 import { NotificationToaster } from "@/components/notification-toaster";
 import { SosBanner } from "@/components/sos-banner";
 import { getBrand } from "@/lib/brand";
+import { ThemeProvider, THEME_BOOTSTRAP_SCRIPT } from "@/lib/theme-context";
 
 const brand = getBrand();
 
@@ -30,8 +31,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" data-theme="dark" data-density="compact" suppressHydrationWarning>
+    <html lang="en" data-density="compact" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link
           rel="stylesheet"
@@ -39,27 +41,29 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning className="bg-surface-0 text-text-primary">
-        <I18nProvider>
-          <ToastProvider>
-            <AuthProvider>
-            <div className="relative min-h-screen flex flex-col bg-surface-950 text-white overflow-x-hidden">
-              {/* Ambient brand backdrop */}
-              <div
-                aria-hidden
-                className="pointer-events-none fixed inset-0 z-0 bg-brand-radial"
-              />
-              <div
-                aria-hidden
-                className="pointer-events-none fixed inset-x-0 top-0 h-px bg-brand-gradient z-50"
-              />
-              <div className="relative z-10 flex-1">{children}</div>
-              <BrandFooter />
-            </div>
-            <SosBanner />
-            <NotificationToaster />
-            </AuthProvider>
-          </ToastProvider>
-        </I18nProvider>
+        <ThemeProvider>
+          <I18nProvider>
+            <ToastProvider>
+              <AuthProvider>
+              <div className="relative min-h-screen flex flex-col bg-surface-0 text-text-primary overflow-x-hidden">
+                {/* Ambient brand backdrop — opacity tuned for both themes */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none fixed inset-0 z-0 bg-brand-radial opacity-100 dark:opacity-100"
+                />
+                <div
+                  aria-hidden
+                  className="pointer-events-none fixed inset-x-0 top-0 h-px bg-brand-gradient z-50"
+                />
+                <div className="relative z-10 flex-1">{children}</div>
+                <BrandFooter />
+              </div>
+              <SosBanner />
+              <NotificationToaster />
+              </AuthProvider>
+            </ToastProvider>
+          </I18nProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
