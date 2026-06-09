@@ -1,0 +1,164 @@
+# ---------------------------------------------------------------
+# Production self-host stack for Gem Aromatics VMS.
+# Single-host deployment: one Linux server with Docker + Compose.
+#
+# Brings up:
+#   - postgres   (Postgres 16 + persistent volume)
+#   - redis      (Redis 7 + persistent AOF)
+#   - api        (NestJS API on :4000)
+#   - web        (Next.js dashboard on :3000)
+#   - kiosk      (Next.js kiosk on :3001) — optional, comment out if unused
+#
+# Reads secrets from `.env` next to this file (see .env.gem.example).
+# DO NOT commit a real .env to git.
+#
+# Bring up:    docker compose -f docker-compose.prod.yml up -d
+# View logs:   docker compose -f docker-compose.prod.yml logs -f api
+# Stop:        docker compose -f docker-compose.prod.yml down
+# Update:      docker compose -f docker-compose.prod.yml pull && \
+#              docker compose -f docker-compose.prod.yml up -d --build
+# ---------------------------------------------------------------
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gem_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gem}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD missing in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-gem_vms}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backups:/backups
+    ports:
+      - "127.0.0.1:5432:5432"     # local-only; remove ports block to keep DB fully private
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gem} -d ${POSTGRES_DB:-gem_vms}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - gem_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: gem_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --save 60 1
+    volumes:
+      - redisdata:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - gem_net
+
+  api:
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile
+    container_name: gem_api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gem}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gem_vms}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET missing in .env}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM: ${RESEND_FROM:-}
+      BRAND_FOOTER_TEXT: ${BRAND_FOOTER_TEXT:-Gem Aromatics Limited · powered by Personify Crafters}
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - gem_net
+
+  web:
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4000}
+        NEXT_PUBLIC_BRAND_CODE: ${BRAND_CODE:-gem}
+    container_name: gem_web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4000}
+      NEXT_PUBLIC_BRAND_CODE: ${BRAND_CODE:-gem}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - gem_net
+
+  # Optional: front-desk kiosk app. Comment block out if not deploying.
+  # kiosk:
+  #   build:
+  #     context: .
+  #     dockerfile: ./apps/kiosk/Dockerfile
+  #     args:
+  #       NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4000}
+  #   container_name: gem_kiosk
+  #   restart: unless-stopped
+  #   environment:
+  #     NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4000}
+  #   ports:
+  #     - "3001:3000"
+  #   depends_on:
+  #     - api
+  #   networks:
+  #     - gem_net
+
+  # Optional: nightly database backup to ./backups
+  backup:
+    image: postgres:16-alpine
+    container_name: gem_backup
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    entrypoint: >
+      sh -c "
+        while true; do
+          ts=$$(date +%Y%m%d_%H%M%S);
+          echo Backing up to /backups/gem_vms_$$ts.sql.gz;
+          pg_dump -h postgres -U ${POSTGRES_USER:-gem} -d ${POSTGRES_DB:-gem_vms} | gzip > /backups/gem_vms_$$ts.sql.gz;
+          # keep last 14 daily backups
+          ls -1t /backups/gem_vms_*.sql.gz 2>/dev/null | tail -n +15 | xargs -r rm --;
+          sleep 86400;
+        done
+      "
+    networks:
+      - gem_net
+
+networks:
+  gem_net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
