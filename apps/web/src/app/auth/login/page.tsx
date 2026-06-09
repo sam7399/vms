@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Logo } from '@/components/logo';
 import { Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
+import { getBrand } from '@/lib/brand';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -18,6 +19,8 @@ export default function LoginPage() {
   const { login } = useAuth();
   const { t } = useI18n();
   const router = useRouter();
+  const brand = getBrand();
+  const isGem = brand.code === 'gem';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,12 +54,16 @@ export default function LoginPage() {
         <div className="relative z-10 m-auto px-12 max-w-md">
           <Logo size={56} />
           <h1 className="mt-10 text-4xl font-semibold text-white leading-tight">
-            Enterprise visitor
-            <br /> &amp; workforce platform
+            {isGem ? (
+              <>Visitor &amp; workforce<br />intelligence platform</>
+            ) : (
+              <>Enterprise visitor<br /> &amp; workforce platform</>
+            )}
           </h1>
-          <p className="mt-4 text-white/80">
-            Real-time gate intelligence, contract workforce ops, compliance + audit,
-            face recognition. Built by Personify Crafters for The Studio Infinito.
+          <p className="mt-4 text-white/85">
+            {isGem
+              ? 'Real-time gate intelligence, contract workforce ops, compliance + audit, face recognition — deployed for Gem Aromatics Limited.'
+              : 'Real-time gate intelligence, contract workforce ops, compliance + audit, face recognition. Built by Personify Crafters for The Studio Infinito.'}
           </p>
           <div className="mt-10 grid grid-cols-2 gap-3 text-xs text-white/80">
             <Feat label="Real-time headcount" />
@@ -158,14 +165,16 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-8 bg-white/[0.03] border border-white/[0.06] rounded-lg p-4 text-xs text-zinc-400">
-            <p className="font-semibold text-zinc-300 mb-2">Demo credentials</p>
-            <ul className="space-y-1 font-mono">
-              <li>admin@vms.com / admin123</li>
-              <li>host@demo.local / password123</li>
-              <li>admin@beta.local / beta123</li>
-            </ul>
-          </div>
+          {!isGem && (
+            <div className="mt-8 bg-white/[0.03] border border-white/[0.06] rounded-lg p-4 text-xs text-zinc-400">
+              <p className="font-semibold text-zinc-300 mb-2">Demo credentials</p>
+              <ul className="space-y-1 font-mono">
+                <li>admin@vms.com / admin123</li>
+                <li>host@demo.local / password123</li>
+                <li>admin@beta.local / beta123</li>
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     </div>

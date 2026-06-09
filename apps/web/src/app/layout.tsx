@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   title: brand.productName + " | Built by Personify Crafters",
   description: brand.description,
   authors: [{ name: "Personify Crafters" }],
-  themeColor: "#7c3aed",
+  themeColor: "#66B848",
   openGraph: {
     title: brand.ogTitle,
     description: brand.description,

@@ -13,22 +13,27 @@ interface Props {
 
 export function Logo({ size = 36, showWordmark = true, href = '/', className = '' }: Props) {
   const brand = getBrand();
+  // Gem logo is a wide wordmark+icon — render in aspect ratio with a
+  // wider base and let the brand image speak for itself (no extra wordmark).
+  const isWide = brand.code === 'gem';
+
   const inner = (
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
       <Image
         src={brand.logoSrc}
         alt={brand.tagline}
-        width={size}
+        width={isWide ? size * 3 : size}
         height={size}
         priority
-        className="rounded-lg"
+        className={isWide ? 'h-9 w-auto object-contain' : 'rounded-lg'}
+        style={isWide ? { height: size } : undefined}
       />
-      {showWordmark && (
+      {showWordmark && !isWide && (
         <span className="flex flex-col leading-tight">
-          <span className="text-lg font-semibold text-white tracking-tight">
+          <span className="text-lg font-semibold text-text-primary tracking-tight">
             {brand.shortName}
           </span>
-          <span className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+          <span className="text-[10px] uppercase tracking-[0.18em] text-text-tertiary">
             {brand.tagline}
           </span>
         </span>

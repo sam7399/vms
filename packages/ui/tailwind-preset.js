@@ -39,30 +39,32 @@ module.exports = {
         },
 
         // Brand — fixed across themes
+        // Brand — Gem Aromatics leaf green (derived from official logo)
         brand: {
-          50: '#f5f3ff',
-          100: '#ede9fe',
-          200: '#ddd6fe',
-          300: '#c4b5fd',
-          400: '#a78bfa',
-          500: '#8b5cf6',
-          600: '#7c3aed',
-          700: '#6d28d9',
-          800: '#5b21b6',
-          900: '#4c1d95',
-          950: '#2e1065',
+          50: '#F0F9EB',
+          100: '#DCF0CA',
+          200: '#BBE39A',
+          300: '#94D366',
+          400: '#7AC846',
+          500: '#66B848',
+          600: '#559938',
+          700: '#45792D',
+          800: '#355F23',
+          900: '#28471A',
+          950: '#142510',
         },
+        // Accent — Gem Aromatics water/hand blue (derived from official logo)
         accent: {
-          50: '#fff7ed',
-          100: '#ffedd5',
-          200: '#fed7aa',
-          300: '#fdba74',
-          400: '#fb923c',
-          500: '#f97316',
-          600: '#ea580c',
-          700: '#c2410c',
-          800: '#9a3412',
-          900: '#7c2d12',
+          50: '#EBF6FB',
+          100: '#D2EAF4',
+          200: '#A5D5E8',
+          300: '#6FB8D5',
+          400: '#3F9DC4',
+          500: '#1F88BE',
+          600: '#176E9D',
+          700: '#135680',
+          800: '#0F4566',
+          900: '#0B344C',
         },
         magenta: {
           400: '#e879f9',
@@ -88,10 +90,11 @@ module.exports = {
         'data-6': '#F59E0B',
       },
       backgroundImage: {
+        // Gem Aromatics — leaf-green → water-blue
         'brand-gradient':
-          'linear-gradient(135deg, #7c3aed 0%, #c026d3 50%, #fb923c 100%)',
+          'linear-gradient(135deg, #66B848 0%, #3F9DC4 60%, #1F88BE 100%)',
         'brand-radial':
-          'radial-gradient(ellipse at top, rgba(124,58,237,0.14), transparent 55%), radial-gradient(ellipse at bottom right, rgba(251,146,60,0.06), transparent 60%)',
+          'radial-gradient(ellipse at top, rgba(102,184,72,0.14), transparent 55%), radial-gradient(ellipse at bottom right, rgba(31,136,190,0.10), transparent 60%)',
       },
       fontFamily: {
         sans: [
@@ -134,9 +137,9 @@ module.exports = {
         full: '9999px',
       },
       boxShadow: {
-        brand: '0 10px 40px -10px rgba(124, 58, 237, 0.45)',
+        brand: '0 10px 40px -10px rgba(102, 184, 72, 0.45)',
         'brand-glow':
-          '0 0 0 1px rgba(124,58,237,0.4), 0 8px 30px rgba(192,38,211,0.25)',
+          '0 0 0 1px rgba(102,184,72,0.4), 0 8px 30px rgba(31,136,190,0.25)',
         'op-1':
           '0 1px 2px rgba(0,0,0,0.4), 0 0 0 1px var(--border-subtle)',
         'op-2':
